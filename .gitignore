@@ -1,0 +1,7 @@
+*.o
+/test/*_test
+/tmp
+/cake_libs
+/bin
+*.log
+visualizer.py
