@@ -28,9 +28,9 @@ build/%.o: %.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) -c $^ -o $@
 
-lib_test: build/lib_test.o build/lib.o
+lib_test: build/lib_test.o build/lib.o build/table.o
 	@mkdir -p bin
-	$(CC) -lcunit -o bin/$@ $^
+	$(CC) -lcunit -lxxhash -o bin/$@ $^
 
 tests: $(TESTS:test/%.c=%)
 
