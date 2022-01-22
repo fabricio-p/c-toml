@@ -28,14 +28,14 @@ TOMLTable TOMLTable_with_size(int size)
   return table;
 }
 
-int TOMLTable_set(TOMLTable *table, char *key, TOMLValue *value)
+TOMLValue *TOMLTable_set_empty(TOMLTable *table, char const *key)
 {
-  int status = TOML_TABLE_OK;
+  TOMLValue *value = NULL;
   Header *header = headerof(*table);
   if (header->count * 3 >= header->size)
   {
     if (expand(table) != TOML_TABLE_OK)
-      return TOML_TABLE_NOMEM;
+      return NULL;
   }
   int len = strlen(key);
   XXH32_hash_t hash = XXH32(key, len, 0);
@@ -46,28 +46,40 @@ int TOMLTable_set(TOMLTable *table, char *key, TOMLValue *value)
        entry < end; ++entry
       )
   {
-    if (entry->key == NULL && entry->value.kind == 0)
+    if ((entry->key == NULL && entry->value.kind == 0) ||
+        strcmp(entry->key, key) == 0)
     {
-      ++(header->count);
-      entry->key = key;
-      // memcpy bad
-      entry->value.kind = value->kind;
-      // bc max width is 8 bytes and float_ is the only one guaranteed
-      // to be of that size
-      entry->value.float_ = value->float_;
-      break;
-    } else if (strcmp(entry->key, key) == 0)
-    {
-      status = TOML_TABLE_OVERR;
-      entry->value.kind = value->kind;
-      entry->value.float_ = value->float_;
+      if (entry->key == NULL)
+      {
+        ++(header->count);
+        entry->key = (String)key;
+      }
+      value = &(entry->value);
       break;
     }
+  }
+  return value;
+}
+
+int TOMLTable_set(TOMLTable *table_p, char const *key, TOMLValue *value)
+{
+  int status = TOML_TABLE_OK;
+  TOMLValue *val_p = TOMLTable_set_empty(table_p, key);
+  if (val_p == NULL)
+  {
+    status = TOML_TABLE_NOMEM;
+  } else
+  {
+    if (val_p->kind != 0)
+    {
+      status = TOML_TABLE_OVERR;
+    }
+    *val_p = *value;
   }
   return status;
 }
 
-TOMLValue *TOMLTable_get(TOMLTable table, char *key)
+TOMLValue *TOMLTable_get(TOMLTable table, char const *key)
 {
   TOMLValue *value = NULL;
   Header *header = headerof(table);
@@ -76,14 +88,11 @@ TOMLValue *TOMLTable_get(TOMLTable table, char *key)
   int index = hash % header->size;
   for (
        TOMLEntry *entry = &(table[index]),
-                 *const end = &(table[header->size]);
+       *const end = &(table[header->size]);
        entry < end; ++entry
       )
   {
-    if (entry->key == NULL && entry->value.kind == 0)
-    {
-      break;
-    } else if (strcmp(entry->key, key) == 0)
+    if (entry->key != NULL && strcmp(entry->key, key) == 0)
     {
       value = &(entry->value);
       break;

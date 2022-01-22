@@ -1,5 +1,5 @@
-#ifndef CAKE_UTIL_H
-#define CAKE_UTIL_H
+#ifndef C_TOML_UTIL_H
+#define C_TOML_UTIL_H
 #include <stdio.h>
 #include <stdbool.h>
 #include <c-string/lib.h>
@@ -39,4 +39,4 @@ StringBuffer read_file(char *path, int *size_p)
 #define is_empty(c)                                         \
   ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\0')
 
-#endif /* CAKE_UTIL_H */
+#endif /* C_TOML_UTIL_H */

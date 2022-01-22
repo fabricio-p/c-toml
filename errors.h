@@ -1,5 +1,5 @@
-#ifndef TOML_PARSR_ERRORS_H
-#define TOML_PARSR_ERRORS_H
+#ifndef C_TOML_ERRORS_H
+#define C_TOML_ERRORS_H
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>

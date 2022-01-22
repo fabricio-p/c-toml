@@ -3,12 +3,16 @@ HEADER = $(wildcard include/**/*.h)
 OBJS = $(SRC:%.c=build/%.o)
 CC ?= clang
 TESTS = $(wildcard test/*.c)
-CFLAGS += -std=c99 -I . -I cake_libs/ -Ofast                         \
-		  -Wall -Wextra -Wformat=2 -Wshadow                          \
+CFLAGS += -std=c99 -I . -I cake_libs/ -O0 -g                         \
+		  		-Wall -Wextra -Wformat=2 -Wshadow                          \
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs  \
-		  -Wno-unused-parameter -Wno-unused-command-line-argument    \
-		  -Wno-missing-braces -Wno-unused-function
+		  		-Wno-unused-parameter -Wno-unused-command-line-argument    \
+		  		-Wno-missing-braces -Wno-unused-function
+
+ifeq ($(MODE), debug)
+	CLFAGS += -DDENUG
+endif
 
 .PHONY: all tests clean
 

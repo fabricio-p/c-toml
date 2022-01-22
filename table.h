@@ -1,10 +1,11 @@
 #ifndef TOML_TABLE_H
 #define TOML_TABLE_H
 
-TOMLTable TOMLTable_with_size(int);
-TOMLValue *TOMLTable_get     (TOMLTable, char *);
-int       TOMLTable_set      (TOMLTable *, char *, TOMLValue *);
-void      TOMLTable_destroy  (TOMLTable);
+TOMLTable TOMLTable_with_size (int);
+TOMLValue *TOMLTable_get      (TOMLTable, char const *);
+TOMLValue *TOMLTable_set_empty(TOMLTable *, char const *);
+int       TOMLTable_set       (TOMLTable *, char const *, TOMLValue *);
+void      TOMLTable_destroy   (TOMLTable);
 
 #define TOML_TABLE_OK    0
 #define TOML_TABLE_NOMEM -1

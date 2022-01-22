@@ -258,213 +258,191 @@ void test_parse_datetime(void)
   CU_ASSERT_EQUAL_FATAL(value.date.year, 2021);
   CU_ASSERT_EQUAL_FATAL(value.date.month, 12);
 }
-/* void test_parse_array(void)
+void test_parse_array(void)
 {
 	TOMLCtx ctx = make_toml("[\"foo\", 3, 43.53]", 0);
 	TOMLPosition position;
-	TOMLValue arr;
-	TOML_parse_array(&ctx, &arr);
+	TOMLArray arr = NULL;
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_array(&ctx, &arr), TOML_E_OK);
 	position = TOML_position(&ctx);
 
-	CU_ASSERT_EQUAL_FATAL(arr.kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr.array), 3);
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr), 3);
 		
-	CU_ASSERT_EQUAL_FATAL(arr.array[0].kind, TOML_STRING);
-	CU_ASSERT_STRING_EQUAL_FATAL(arr.array[0].string, "foo");
+	CU_ASSERT_EQUAL_FATAL(arr[0].kind, TOML_STRING);
+	CU_ASSERT_STRING_EQUAL_FATAL(arr[0].string, "foo");
 
-	CU_ASSERT_EQUAL_FATAL(arr.array[1].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr.array[1].integer, 3);
+	CU_ASSERT_EQUAL_FATAL(arr[1].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr[1].integer, 3);
 
-	CU_ASSERT_EQUAL_FATAL(arr.array[2].kind, TOML_FLOAT);
-	CU_ASSERT_EQUAL_FATAL(arr.array[2].float_, 43.53);
+	CU_ASSERT_EQUAL_FATAL(arr[2].kind, TOML_FLOAT);
+	CU_ASSERT_EQUAL_FATAL(arr[2].float_, 43.53);
 
 	CU_ASSERT_EQUAL_FATAL(position.offset, 17);
 	CU_ASSERT_EQUAL_FATAL(position.column, 17);
-	String_cleanup(arr.array[0].string);
-	TOMLArray_cleanup(arr.array);
+	TOMLArray_destroy(arr);
 
+  //system("clear");
 	ctx = make_toml(
 		"[44, 3433, [\"bar\", 3.4339], 232.9, 977, [[38, 88], \n"
 		"[\"nested\", [\"more nested\", 34.38], 96.65, 836521], 232],\n"
 		"\"a lot of nesting, don't you think so?\", [true, false]]",
 		0
 	);
-	TOML_parse_array(&ctx, &arr);
+  TOMLStatus s = TOML_parse_array(&ctx, &arr);
 	position = TOML_position(&ctx);
+	CU_ASSERT_EQUAL_FATAL(s, TOML_E_OK);
 	// print_value(&arr, 0);
-	CU_ASSERT_EQUAL_FATAL(arr.kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr.array), 8);
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr), 8);
 
-	CU_ASSERT_EQUAL_FATAL(arr.array[0].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr.array[0].integer, 44);
+	CU_ASSERT_EQUAL_FATAL(arr[0].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr[0].integer, 44);
 
-	CU_ASSERT_EQUAL_FATAL(arr.array[1].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr.array[1].integer, 3433);
+	CU_ASSERT_EQUAL_FATAL(arr[1].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr[1].integer, 3433);
 
 	// Asserting nested array and it's items.
-	TOMLValue *arr1 = &arr.array[2];
-	CU_ASSERT_EQUAL_FATAL(arr1->kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr1->array), 2);
+	CU_ASSERT_EQUAL_FATAL(arr[2].kind, TOML_ARRAY);
+	TOMLArray arr1 = arr[2].array;
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr1), 2);
 
-	CU_ASSERT_EQUAL_FATAL(arr1->array[0].kind, TOML_STRING);
-	CU_ASSERT_STRING_EQUAL_FATAL(arr1->array[0].string, "bar");
+	CU_ASSERT_EQUAL_FATAL(arr1[0].kind, TOML_STRING);
+	CU_ASSERT_STRING_EQUAL_FATAL(arr1[0].string, "bar");
 
-	CU_ASSERT_EQUAL_FATAL(arr1->array[1].kind, TOML_FLOAT);
-	CU_ASSERT_EQUAL_FATAL(arr1->array[1].float_, 3.4339);
+	CU_ASSERT_EQUAL_FATAL(arr1[1].kind, TOML_FLOAT);
+	CU_ASSERT_EQUAL_FATAL(arr1[1].float_, 3.4339);
 
-	TOMLArray_cleanup(arr1->array);
+	CU_ASSERT_EQUAL_FATAL(arr[3].kind, TOML_FLOAT);
+	CU_ASSERT_EQUAL_FATAL(arr[3].float_, 232.9);
 
-	CU_ASSERT_EQUAL_FATAL(arr.array[3].kind, TOML_FLOAT);
-	CU_ASSERT_EQUAL_FATAL(arr.array[3].float_, 232.9);
+	CU_ASSERT_EQUAL_FATAL(arr[4].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr[4].integer, 977);
 
-	CU_ASSERT_EQUAL_FATAL(arr.array[4].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr.array[4].integer, 977);
+	CU_ASSERT_EQUAL_FATAL(arr[5].kind, TOML_ARRAY);
+	TOMLArray arr2 = arr[5].array;
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr2), 3);
 
-	TOMLValue *arr2 = &arr.array[5];
-	CU_ASSERT_EQUAL_FATAL(arr2->kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr2->array), 3);
+	CU_ASSERT_EQUAL_FATAL(arr2[0].kind, TOML_ARRAY);
+	TOMLArray arr3 = arr2[0].array;
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr3), 2);
 
-	TOMLValue *arr3 = &arr2->array[0];
-	CU_ASSERT_EQUAL_FATAL(arr3->kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr3->array), 2);
+	CU_ASSERT_EQUAL_FATAL(arr3[0].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr3[0].integer, 38);
 
-	CU_ASSERT_EQUAL_FATAL(arr3->array[0].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr3->array[0].integer, 38);
+	CU_ASSERT_EQUAL_FATAL(arr3[1].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr3[1].integer, 88);
 
-	CU_ASSERT_EQUAL_FATAL(arr3->array[1].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr3->array[1].integer, 88);
+	CU_ASSERT_EQUAL_FATAL(arr2[1].kind, TOML_ARRAY);
+	TOMLArray arr4 = arr2[1].array;
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr4), 4);
 
-	TOMLArray_cleanup(arr3->array);
+	CU_ASSERT_EQUAL_FATAL(arr4[0].kind, TOML_STRING);
+	CU_ASSERT_STRING_EQUAL_FATAL(arr4[0].string, "nested");
+	String_cleanup(arr4[0].string);
 
-	TOMLValue *arr4 = &arr2->array[1];
-	CU_ASSERT_EQUAL_FATAL(arr4->kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr4->array), 4);
+	CU_ASSERT_EQUAL_FATAL(arr4[1].kind, TOML_ARRAY);
+	TOMLArray arr5 = arr4[1].array;
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr5), 2);
 
-	CU_ASSERT_EQUAL_FATAL(arr4->array[0].kind, TOML_STRING);
-	CU_ASSERT_STRING_EQUAL_FATAL(arr4->array[0].string, "nested");
-	String_cleanup(arr4->array[0].string);
+	CU_ASSERT_EQUAL_FATAL(arr5[0].kind, TOML_STRING);
+	CU_ASSERT_STRING_EQUAL_FATAL(arr5[0].string, "more nested");
 
-	TOMLValue *arr5 = &arr4->array[1];
-	CU_ASSERT_EQUAL_FATAL(arr5->kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr5->array), 2);
+	CU_ASSERT_EQUAL_FATAL(arr5[1].kind, TOML_FLOAT);
+	CU_ASSERT_EQUAL_FATAL(arr5[1].float_, 34.38);
 
-	CU_ASSERT_EQUAL_FATAL(arr5->array[0].kind, TOML_STRING);
-	CU_ASSERT_STRING_EQUAL_FATAL(arr5->array[0].string, "more nested");
-	String_cleanup(arr5->array[0].string);
+	CU_ASSERT_EQUAL_FATAL(arr4[2].kind, TOML_FLOAT);
+	CU_ASSERT_EQUAL_FATAL(arr4[2].float_, 96.65);
 
-	CU_ASSERT_EQUAL_FATAL(arr5->array[1].kind, TOML_FLOAT);
-	CU_ASSERT_EQUAL_FATAL(arr5->array[1].float_, 34.38);
+	CU_ASSERT_EQUAL_FATAL(arr4[3].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr4[3].integer, 836521);
 
-	TOMLArray_cleanup(arr5->array);
+	CU_ASSERT_EQUAL_FATAL(arr2[2].kind, TOML_INTEGER);
+	CU_ASSERT_EQUAL_FATAL(arr2[2].integer, 232);
 
-	CU_ASSERT_EQUAL_FATAL(arr4->array[2].kind, TOML_FLOAT);
-	CU_ASSERT_EQUAL_FATAL(arr4->array[2].float_, 96.65);
+	CU_ASSERT_EQUAL_FATAL(arr[6].kind, TOML_STRING);
+	CU_ASSERT_STRING_EQUAL_FATAL(arr[6].string,
+			                         "a lot of nesting, don't you think so?");
 
-	CU_ASSERT_EQUAL_FATAL(arr4->array[3].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr4->array[3].integer, 836521);
+	CU_ASSERT_EQUAL_FATAL(arr[7].kind, TOML_ARRAY);
+	TOMLArray arr6 = arr[7].array;
+	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr6), 2);
+	CU_ASSERT_EQUAL_FATAL(arr6[0].kind, TOML_BOOLEAN);
+	CU_ASSERT_FATAL(arr6[0].boolean);
+	CU_ASSERT_EQUAL_FATAL(arr6[1].kind, TOML_BOOLEAN);
+	CU_ASSERT_FATAL(!arr6[1].boolean);
 
-	TOMLArray_cleanup(arr4->array);
-
-	CU_ASSERT_EQUAL_FATAL(arr2->array[2].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(arr2->array[2].integer, 232);
-
-	TOMLArray_cleanup(arr2->array);
-
-	CU_ASSERT_EQUAL_FATAL(arr.array[6].kind, TOML_STRING);
-	CU_ASSERT_STRING_EQUAL_FATAL(arr.array[6].string,
-			"a lot of nesting, don't you think so?");
-
-	TOMLArray_cleanup(arr.array);
-
-	TOMLValue *arr6 = &arr.array[7];
-	CU_ASSERT_EQUAL_FATAL(arr6->kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr6->array), 2);
-	CU_ASSERT_EQUAL_FATAL(arr6->array[0].kind, TOML_BOOLEAN);
-	CU_ASSERT_FATAL(arr6->array[0].boolean);
-	CU_ASSERT_EQUAL_FATAL(arr6->array[1].kind, TOML_BOOLEAN);
-	CU_ASSERT_FATAL(!arr6->array[1].boolean);
-
-	TOMLArray_cleanup(arr6->array);
+  TOMLArray_destroy(arr);
 
 	CU_ASSERT_EQUAL_FATAL(position.offset, 164);
 	CU_ASSERT_EQUAL_FATAL(position.column, 55);
 	CU_ASSERT_EQUAL_FATAL(position.line, 3);
+
+  ctx = make_toml("[2021-12-11, 17:16:00+01]", 0);
+  TOML_parse_array(&ctx, &arr);
+  position = TOML_position(&ctx);
+  CU_ASSERT_EQUAL_FATAL(position.offset, 25);
+  CU_ASSERT_EQUAL_FATAL(position.column, 25);
+  CU_ASSERT_EQUAL_FATAL(position.line, 1);
+
+  CU_ASSERT_EQUAL_FATAL(arr[0].kind, TOML_DATE);
+  CU_ASSERT_EQUAL_FATAL(arr[0].date.year, 2021);
+  CU_ASSERT_EQUAL_FATAL(arr[0].date.month, 12);
+  CU_ASSERT_EQUAL_FATAL(arr[0].date.day, 11);
+
+  CU_ASSERT_EQUAL_FATAL(arr[1].kind, TOML_TIME);
+  CU_ASSERT_EQUAL_FATAL(arr[1].time.hour, 17);
+  CU_ASSERT_EQUAL_FATAL(arr[1].time.min, 16);
+  CU_ASSERT_EQUAL_FATAL(arr[1].time.sec, 0);
+  CU_ASSERT_EQUAL_FATAL(arr[1].time.z[0], '+');
+  CU_ASSERT_EQUAL_FATAL(arr[1].time.z[1], 1);
+  TOMLArray_destroy(arr);
 }
-void test_parse_value(void)
+
+void test_parse_entry(void)
 {
-	TOMLCtx ctx = make_toml(
-						" 68359\n34.37546\n\"foo bar\\\\\\n\"\n"
-						"[34, 5.987893, \"I'm getting tired of this\"]",
-						1
-					);
-	TOMLPosition position;
-	TOMLValue value;
+  TOMLTable table = TOMLTable_with_size(2);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(table);
+  TOMLCtx ctx = make_toml("a = 45", 0);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_entry(&ctx, &table), TOML_E_OK);
+  TOMLValue *val_p = TOMLTable_get(table, "a");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_INTEGER);
+  CU_ASSERT_EQUAL_FATAL(val_p->integer, 45);
 
-	TOML_parse_value(&ctx, &value);
-	++(ctx.offset);
-	position = TOML_position(&ctx);
-	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(value.integer, 68359);
-	CU_ASSERT_EQUAL_FATAL(position.offset, 7);
-	CU_ASSERT_EQUAL_FATAL(position.column, 0);
-	CU_ASSERT_EQUAL_FATAL(position.line, 2);
+  ctx = make_toml("foo.bar = \"baz\"", 0);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_entry(&ctx, &table), TOML_E_OK);
+  val_p = TOMLTable_get(table, "foo");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p->table);
+  do {
+    TOMLValue *val_p2 = TOMLTable_get(val_p->table, "bar");
+    CU_ASSERT_PTR_NOT_NULL_FATAL(val_p2);
+    CU_ASSERT_EQUAL_FATAL(val_p2->kind, TOML_STRING);
+    CU_ASSERT_STRING_EQUAL_FATAL(val_p2->string, "baz");
 
-	TOML_parse_value(&ctx, &value);
-	++(ctx.offset);
-	position = TOML_position(&ctx);
-	printf("Position {\n  offset: %d\n  line: %d\n  column: %d\n}\n",
-			position);
-	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_FLOAT);
-	CU_ASSERT_EQUAL_FATAL(value.float_, 34.37546);
-	CU_ASSERT_EQUAL_FATAL(position.offset, 16);
-	CU_ASSERT_EQUAL_FATAL(position.column, 0);
-	CU_ASSERT_EQUAL_FATAL(position.line, 3);
+  } while (0);
 
-	TOML_parse_value(&ctx, &value);
-	++(ctx.offset);
-	position = TOML_position(&ctx);
-	printf("Position {\n  offset: %d\n  line: %d\n  column: %d\n}\n",
-			position);
-	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_STRING);
-	CU_ASSERT_STRING_EQUAL_FATAL(value.string, "foo bar\\\n");
-	puts(ctx.offset);
-	CU_ASSERT_EQUAL_FATAL(position.offset, 31);
-	printf("%d\n", position.column);
-	CU_ASSERT_EQUAL_FATAL(position.column, 0);
-	CU_ASSERT_EQUAL_FATAL(position.line, 4);
-	String_cleanup(value.string);
+  ctx = make_toml("\"hello world\".'hmmm\\n' = [true, false]", 0);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_entry(&ctx, &table), TOML_E_OK);
+  val_p = TOMLTable_get(table, "hello world");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p->table);
+  do {
+    TOMLValue *val_p2 = TOMLTable_get(val_p->table, "hmmm\\n");
+    CU_ASSERT_PTR_NOT_NULL_FATAL(val_p2);
+    CU_ASSERT_EQUAL_FATAL(val_p2->kind, TOML_ARRAY);
+    TOMLArray array = val_p2->array;
+    CU_ASSERT_PTR_NOT_NULL_FATAL(array);
+    CU_ASSERT_EQUAL_FATAL(TOMLArray_len(array), 2);
+    CU_ASSERT_EQUAL_FATAL(array[0].kind, TOML_BOOLEAN);
+    CU_ASSERT_EQUAL_FATAL(array[1].kind, TOML_BOOLEAN);
+    CU_ASSERT_FATAL(array[0].boolean);
+    CU_ASSERT_FATAL(!array[1].boolean);
+  } while (0);
 
-	TOML_parse_value(&ctx, &value);
-	position = TOML_position(&ctx);
-	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_ARRAY);
-	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(value.array), 3);
-
-	CU_ASSERT_EQUAL_FATAL(value.array[0].kind, TOML_INTEGER);
-	CU_ASSERT_EQUAL_FATAL(value.array[0].integer, 34);
-
-	CU_ASSERT_EQUAL_FATAL(value.array[1].kind, TOML_FLOAT);
-	CU_ASSERT_EQUAL_FATAL(value.array[1].float_, 5.987893);
-
-	CU_ASSERT_EQUAL_FATAL(value.array[2].kind, TOML_STRING);
-	CU_ASSERT_STRING_EQUAL_FATAL(value.array[2].string,
-			"I'm getting tired of this");
-
-	String_cleanup(value.array[2].string);
-	TOMLArray_cleanup(value.array);
-
-	CU_ASSERT_EQUAL_FATAL(position.offset, 73);
-	CU_ASSERT_EQUAL_FATAL(position.column, 43);
-	CU_ASSERT_EQUAL_FATAL(position.line, 4);
-
-	ctx = make_toml("true", 0);
-	TOML_parse_value(&ctx, &value);
-	position = TOML_position(&ctx);
-	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_BOOLEAN);
-	CU_ASSERT_FATAL(value.boolean);
-	CU_ASSERT_EQUAL_FATAL(position.offset, 4);
-	CU_ASSERT_EQUAL_FATAL(position.column, 4);
-	CU_ASSERT_EQUAL_FATAL(position.line, 1);
-} */
+  TOMLTable_destroy(table);
+}
 
 int main(int argc, char **argv)
 {
@@ -475,8 +453,8 @@ int main(int argc, char **argv)
 		{ "#parse_ml_string", test_parse_ml_string },
 		{ "#parse_time",      test_parse_time      },
 		{ "#parse_datetime",  test_parse_datetime  },
-    /* { "#parse_array",     test_parse_array     },
-		{ "#parse_value",     test_parse_value     }, */
+    { "#parse_array",     test_parse_array     },
+    { "#parse_entry",     test_parse_entry     },
 		CU_TEST_INFO_NULL
 	};
 	CU_SuiteInfo suites[] = {
