@@ -61,7 +61,9 @@ typedef uint8_t TOMLKind;
 #define TOML_E_INVALID_HEX_ESCAPE   16
 #define TOML_E_EXPECTED_TABLE_VALUE 17
 #define TOML_E_DUPLICATE_KEY        18
-#define TOML_E_EOF                  19
+#define TOML_E_COMMA_EXPECTED       19
+#define TOML_E_COMMA_NOT_EXPECTED   20
+#define TOML_E_EOF                  21
 
 // Typedefing the structs before defining their bodies
 typedef struct TOMLDate     TOMLDate;
@@ -143,22 +145,22 @@ struct TOMLPosition {
 
 TOMLStatus  TOML_init           (TOMLCtx *, char *);
 /* TOMLStatus  TOML_parse           (TOMLCtx *, TOMLTable *);
-TOMLStatus  TOML_parse_table      (TOMLCtx *, TOMLTable *);
+TOMLStatus  TOML_parse_table      (TOMLCtx *, TOMLTable *); */
 TOMLStatus  TOML_prse_inline_table(TOMLCtx *, TOMLTable *);
-TOMLStatus  TOML_parse_entry      (TOMLCtx *, TOMLEntry *); */
 
 // Checks and invokes the right parser function.
-TOMLStatus  TOML_parse_value      (TOMLCtx *, TOMLValue *);
+TOMLStatus  TOML_parse_value       (TOMLCtx *, TOMLValue *);
 // It can be an integer or a float, we don't know before we parse it.
-TOMLStatus  TOML_parse_number     (TOMLCtx *, TOMLValue *);
+TOMLStatus  TOML_parse_number      (TOMLCtx *, TOMLValue *);
 // Takes String * because we know it's a string.
-TOMLStatus  TOML_parse_sl_string  (TOMLCtx *, String *);
-TOMLStatus  TOML_parse_ml_string  (TOMLCtx *, String *);
-TOMLStatus  TOML_parse_time       (TOMLCtx *, TOMLTime *);
-TOMLStatus  TOML_parse_datetime   (TOMLCtx *, TOMLValue *);
+TOMLStatus  TOML_parse_sl_string   (TOMLCtx *, String *);
+TOMLStatus  TOML_parse_ml_string   (TOMLCtx *, String *);
+TOMLStatus  TOML_parse_time        (TOMLCtx *, TOMLTime *);
+TOMLStatus  TOML_parse_datetime    (TOMLCtx *, TOMLValue *);
 // Like above, we know it's an array.
-TOMLStatus  TOML_parse_array      (TOMLCtx *, TOMLArray *);
-TOMLStatus  TOML_parse_entry      (TOMLCtx *, TOMLTable *);
+TOMLStatus  TOML_parse_array       (TOMLCtx *, TOMLArray *);
+TOMLStatus  TOML_parse_entry       (TOMLCtx *, TOMLTable *);
+TOMLStatus  TOML_parse_inline_table(TOMLCtx *, TOMLTable *);
 
 void TOMLValue_destroy(TOMLValue *);
 TOMLPosition TOML_position(TOMLCtx const *);

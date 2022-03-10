@@ -808,7 +808,8 @@ inf_check:
   }
   current = *offset;
   throw_if(!is_empty(current) &&
-           !(current == '#' || current == ',' || current == ']'),
+           !(current == '#' || current == ',' || current == ']' ||
+             current == '}'),
            INVALID_VALUE);
   for (; offset < end;)
   {
@@ -886,6 +887,7 @@ TOMLStatus TOML_parse_entry(TOMLCtx *ctx, TOMLTable *table_p)
       {
         CASE('a'...'z')
         CASE('A'...'Z')
+        CASE('0'...'9')
         CASE('_')
         CASE('-')
         {
@@ -906,6 +908,10 @@ TOMLStatus TOML_parse_entry(TOMLCtx *ctx, TOMLTable *table_p)
           throw_if(StringBuffer_len(buff) == 0, INVALID_KEY);
           key = StringBuffer_transform_to_string(&buff);
           goto out;
+        }
+        default:
+        {
+          throw(INVALID_KEY);
         }
       }
     }
@@ -955,5 +961,54 @@ catch:
       String_cleanup(key);
     }
   }
+  return status;
+}
+
+TOMLStatus TOML_parse_inline_table(TOMLCtx *ctx, TOMLTable *table_p)
+{
+  TOMLStatus status = TOML_E_OK;
+  char const *offset = ctx->offset;
+  char const *const end = ctx->end;
+  int comma = false;
+  char chr = *(++offset);
+  for (; offset < end; ++offset)
+  {
+    if (!(chr == ' ' || chr == '\t' || chr == '\n'))
+    {
+      if (chr == ',')
+      {
+        if (comma)
+        {
+          comma = false;
+          continue;
+        } else
+        {
+          throw(COMMA_NOT_EXPECTED);
+        }
+      } else if (chr == '}')
+      {
+        break;
+      } else
+      {
+        if (comma)
+        {
+          throw(COMMA_EXPECTED);
+        } else
+        {
+          ctx->offset = offset;
+          status = TOML_parse_entry(ctx, table_p);
+          offset = ctx->offset;
+          try(status);
+        }
+      }
+    }
+    chr = *offset;
+  }
+  if (chr != '}')
+  {
+    status = (chr == '\0') ? TOML_E_EOF : TOML_E_COMMA_EXPECTED;
+  }
+catch:
+  ctx->offset = offset;
   return status;
 }

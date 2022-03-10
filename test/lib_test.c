@@ -444,17 +444,43 @@ void test_parse_entry(void)
   TOMLTable_destroy(table);
 }
 
+void test_parse_inline_table(void)
+{
+  TOMLCtx ctx = make_toml("{foo = \"bar\"}", 0);
+  TOMLTable table = TOMLTable_new();
+  CU_ASSERT_PTR_NOT_NULL_FATAL(table);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_inline_table(&ctx, &table),
+                        TOML_E_OK);
+  TOMLValue *val = TOMLTable_get(table, "foo");
+  CU_ASSERT_EQUAL_FATAL(val->kind, TOML_STRING);
+  CU_ASSERT_STRING_EQUAL_FATAL(val->string, "bar");
+
+  ctx = make_toml("{bar.baz = 69}", 0);
+  /* CU_ASSERT_EQUAL_FATAL( */ printf("%d\n", TOML_parse_inline_table(&ctx, &table)); /* ,
+                        TOML_E_OK); */
+  TOMLPosition pos = TOML_position(&ctx);
+  printf("%d, %d, %d\n", pos);
+  return;
+  val = TOMLTable_get(table, "bar");
+  CU_ASSERT_EQUAL_FATAL(val->kind, TOML_TABLE);
+  val = TOMLTable_get(val->table, "baz");
+  CU_ASSERT_EQUAL_FATAL(val->kind, TOML_INTEGER);
+  CU_ASSERT_EQUAL_FATAL(val->integer, 69);
+  TOMLTable_destroy(table);
+}
+
 int main(int argc, char **argv)
 {
 	int status = 0;
 	CU_TestInfo tests[] = {
-		{ "#parse_number",    test_parse_number    },
-		{ "#parse_sl_string", test_parse_sl_string },
-		{ "#parse_ml_string", test_parse_ml_string },
-		{ "#parse_time",      test_parse_time      },
-		{ "#parse_datetime",  test_parse_datetime  },
-    { "#parse_array",     test_parse_array     },
-    { "#parse_entry",     test_parse_entry     },
+		{ "#parse_number",       test_parse_number       },
+		{ "#parse_sl_string",    test_parse_sl_string    },
+		{ "#parse_ml_string",    test_parse_ml_string    },
+		{ "#parse_time",         test_parse_time         },
+		{ "#parse_datetime",     test_parse_datetime     },
+    { "#parse_array",        test_parse_array        },
+    { "#parse_entry",        test_parse_entry        },
+    { "#parse_inline_table", test_parse_inline_table },
 		CU_TEST_INFO_NULL
 	};
 	CU_SuiteInfo suites[] = {
