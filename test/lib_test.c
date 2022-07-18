@@ -1,9 +1,12 @@
+#include <c-ansi-sequences/graphics.h>
+#include <c-ansi-sequences/cursor.h>
+#include <c-ansi-sequences/screen.h>
 #include "testing.h"
 #include "lib.h"
 #include "util.h"
 #include "errors.h"
 
-static inline __attribute__((always_inline))
+// static inline __attribute__((always_inline))
 TOMLCtx make_toml(char const *const data, int const offset)
 {
 	return (TOMLCtx) {
@@ -54,10 +57,7 @@ void test_parse_number(void)
 
 	ctx = make_toml(" 84.378", 1);
 	CU_ASSERT_EQUAL_FATAL(TOML_parse_number(&ctx, &value), TOML_E_OK);
-  // puts(ctx.offset);
 	position = TOML_position(&ctx);
-  // puts(type_name(&value));
-  // printf("%d\n", value.integer);
 	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_FLOAT);
 	CU_ASSERT_EQUAL_FATAL(value.float_, 84.378);
 	CU_ASSERT_EQUAL_FATAL(position.offset, 7);
@@ -74,9 +74,7 @@ void test_parse_number(void)
 	ctx = make_toml("0xff", 0);
 	TOML_parse_number(&ctx, &value);
 	position = TOML_position(&ctx);
-	// printf("%s\n", type_name(&value));
 	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_INTEGER);
-	// printf("%d %x\n", value.integer, value.integer);
 	CU_ASSERT_EQUAL_FATAL(value.integer, 0xff);
 	CU_ASSERT_EQUAL_FATAL(position.offset, 4);
 	CU_ASSERT_EQUAL_FATAL(position.column, 4);
@@ -91,10 +89,7 @@ void test_parse_number(void)
 
 	ctx = make_toml(".1e+3", 0);
 	CU_ASSERT_EQUAL_FATAL(TOML_parse_number(&ctx, &value), TOML_E_OK);
-  // puts(ctx.offset);
 	position = TOML_position(&ctx);
-  // puts(type_name(&value));
-  // printf("%d\n", value.integer);
 	CU_ASSERT_EQUAL_FATAL(value.kind, TOML_FLOAT);
 	CU_ASSERT_EQUAL_FATAL(value.float_, .1e3);
 	CU_ASSERT_EQUAL_FATAL(position.offset, 5);
@@ -104,13 +99,14 @@ void test_parse_sl_string(void)
 {
 	TOMLCtx ctx = make_toml("\"ah yes, parsing\\n\"", 0);
 	TOMLPosition position;
-	String str;
+	String str = NULL;
 	CU_ASSERT_EQUAL_FATAL(TOML_parse_sl_string(&ctx, &str), TOML_E_OK);
 	position = TOML_position(&ctx);
 	CU_ASSERT_STRING_EQUAL_FATAL(str, "ah yes, parsing\n");
 	CU_ASSERT_EQUAL_FATAL(position.offset, 19);
 	CU_ASSERT_EQUAL_FATAL(position.column, 19);
 	String_cleanup(str);
+  str = NULL;
 
 	ctx =  make_toml("'literal strings go brrr\\n'", 0);
 	CU_ASSERT_EQUAL_FATAL(TOML_parse_sl_string(&ctx, &str), TOML_E_OK);
@@ -124,7 +120,7 @@ void test_parse_sl_string(void)
 void test_parse_ml_string(void)
 {
 	TOMLCtx ctx = make_toml("\"\"\"multi\nline\"\"\"", 0);
-  String str;
+  String str = NULL;
   TOMLPosition position;
 	CU_ASSERT_EQUAL_FATAL(TOML_parse_ml_string(&ctx, &str), TOML_E_OK);
 	position = TOML_position(&ctx);
@@ -132,6 +128,7 @@ void test_parse_ml_string(void)
 	CU_ASSERT_EQUAL_FATAL(position.offset, 16);
 	CU_ASSERT_EQUAL_FATAL(position.column, 7);
 	String_cleanup(str);
+  str = NULL;
 
 	ctx = make_toml("\"\"\"foo \\   \n bar\"\"\"", 0);
 	CU_ASSERT_EQUAL_FATAL(TOML_parse_ml_string(&ctx, &str), TOML_E_OK);
@@ -140,6 +137,7 @@ void test_parse_ml_string(void)
 	CU_ASSERT_EQUAL_FATAL(position.offset, 19);
 	CU_ASSERT_EQUAL_FATAL(position.column, 7);
 	String_cleanup(str);
+  str = NULL;
 
 	ctx = make_toml("'''multiline\nliteral\nstring'''", 0);
 	CU_ASSERT_EQUAL_FATAL(TOML_parse_ml_string(&ctx, &str), TOML_E_OK);
@@ -399,37 +397,43 @@ void test_parse_array(void)
 
 void test_parse_entry(void)
 {
-  TOMLTable table = TOMLTable_with_size(2);
+  TOMLTable table = TOMLTable_with_size(4);
   CU_ASSERT_PTR_NOT_NULL_FATAL(table);
   TOMLCtx ctx = make_toml("a = 45", 0);
   CU_ASSERT_EQUAL_FATAL(TOML_parse_entry(&ctx, &table), TOML_E_OK);
-  TOMLValue *val_p = TOMLTable_get(table, "a");
+  TOMLValue const *val_p = TOMLTable_get(table, (String)"a");
   CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
   CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_INTEGER);
   CU_ASSERT_EQUAL_FATAL(val_p->integer, 45);
+  TOMLTable_destroy(table);
 
-  ctx = make_toml("foo.bar = \"baz\"", 0);
+  table = TOMLTable_with_size(4);
+  ctx = make_toml("foo.bar = \"bazzuka\"", 0);
+  // system("clear");
   CU_ASSERT_EQUAL_FATAL(TOML_parse_entry(&ctx, &table), TOML_E_OK);
-  val_p = TOMLTable_get(table, "foo");
+  val_p = TOMLTable_get(table, (String)"foo");
   CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
   CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
   CU_ASSERT_PTR_NOT_NULL_FATAL(val_p->table);
   do {
-    TOMLValue *val_p2 = TOMLTable_get(val_p->table, "bar");
+    TOMLValue const *val_p2 = TOMLTable_get(val_p->table, (String)"bar");
     CU_ASSERT_PTR_NOT_NULL_FATAL(val_p2);
     CU_ASSERT_EQUAL_FATAL(val_p2->kind, TOML_STRING);
-    CU_ASSERT_STRING_EQUAL_FATAL(val_p2->string, "baz");
+    CU_ASSERT_STRING_EQUAL_FATAL(val_p2->string, "bazzuka");
 
   } while (0);
+  TOMLTable_destroy(table);
 
+  table = TOMLTable_with_size(4);
   ctx = make_toml("\"hello world\".'hmmm\\n' = [true, false]", 0);
   CU_ASSERT_EQUAL_FATAL(TOML_parse_entry(&ctx, &table), TOML_E_OK);
-  val_p = TOMLTable_get(table, "hello world");
+  val_p = TOMLTable_get(table, (String)"hello world");
   CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
   CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
   CU_ASSERT_PTR_NOT_NULL_FATAL(val_p->table);
   do {
-    TOMLValue *val_p2 = TOMLTable_get(val_p->table, "hmmm\\n");
+    TOMLValue const *val_p2 = TOMLTable_get(val_p->table,
+                                            (String)"hmmm\\n");
     CU_ASSERT_PTR_NOT_NULL_FATAL(val_p2);
     CU_ASSERT_EQUAL_FATAL(val_p2->kind, TOML_ARRAY);
     TOMLArray array = val_p2->array;
@@ -444,17 +448,94 @@ void test_parse_entry(void)
   TOMLTable_destroy(table);
 }
 
+void test_parse_inline_table(void)
+{
+  TOMLCtx ctx = make_toml("{ foo = 69 }", 0);
+  TOMLTable table = TOMLTable_new();
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_inline_table(&ctx, &table), TOML_E_OK);
+  TOMLValue const *val_p = TOMLTable_get(table, (String)"foo");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_INTEGER);
+  CU_ASSERT_EQUAL_FATAL(val_p->integer, 69);
+  TOMLTable_destroy(table);
+
+  ctx = make_toml("{ foo = \"bar\", baz = 420.0 }", 0);
+  table = TOMLTable_new();
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_inline_table(&ctx, &table), TOML_E_OK);
+  val_p = TOMLTable_get(table, (String)"foo");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_STRING);
+  CU_ASSERT_STRING_EQUAL_FATAL(val_p->string, "bar");
+  val_p = TOMLTable_get(table, (String)"baz");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_FLOAT);
+  CU_ASSERT_EQUAL_FATAL(val_p->float_, 420);
+  TOMLTable_destroy(table);
+
+  ctx = make_toml("{ foo.bar = \"baz\" }", 0);
+  table = TOMLTable_new();
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_inline_table(&ctx, &table), TOML_E_OK);
+  val_p = TOMLTable_get(table, (String)"foo");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
+  val_p = TOMLTable_get(val_p->table, (String)"bar");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_STRING);
+  CU_ASSERT_STRING_EQUAL_FATAL(val_p->string, "baz");
+  TOMLTable_destroy(table);
+
+  fflush(stdout);
+  
+  ctx = make_toml("                            \n\
+                   {                           \n\
+                     foo = { bar = \"bag\" },  \n\
+                     hello.world = true,       \n\
+                     a.\"b\".'c' = [nan, -inf] \n\
+                   }", 69);
+  table = TOMLTable_new();
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_inline_table(&ctx, &table), TOML_E_OK);
+  val_p = TOMLTable_get(table, (String)"foo");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_INLINE_TABLE);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(TOMLTable_get(val_p->table,
+                               (String)"bar")); // foo.bar
+  CU_ASSERT_EQUAL_FATAL(
+      TOMLTable_get(val_p->table, (String)"bar")->kind,
+      TOML_STRING
+  );
+  CU_ASSERT_STRING_EQUAL_FATAL(
+      TOMLTable_get(val_p->table, (String)"bar")->string,
+      "bag"
+  );
+  val_p = TOMLTable_get(table, (String)"hello");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(TOMLTable_get(val_p->table,
+                               (String)"world"));
+  CU_ASSERT_EQUAL_FATAL(
+      TOMLTable_get(val_p->table, (String)"world")->kind,
+      TOML_BOOLEAN
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TOMLTable_get(val_p->table, (String)"world")->boolean,
+      true
+  );
+  val_p = TOMLTable_get(table, (String)"a");
+  TOMLTable_destroy(table);
+}
+
 int main(int argc, char **argv)
 {
 	int status = 0;
 	CU_TestInfo tests[] = {
-		{ "#parse_number",    test_parse_number    },
-		{ "#parse_sl_string", test_parse_sl_string },
-		{ "#parse_ml_string", test_parse_ml_string },
-		{ "#parse_time",      test_parse_time      },
-		{ "#parse_datetime",  test_parse_datetime  },
-    { "#parse_array",     test_parse_array     },
-    { "#parse_entry",     test_parse_entry     },
+		{ "#parse_number",     test_parse_number         },
+		{ "#parse_sl_string",    test_parse_sl_string    },
+		{ "#parse_ml_string",    test_parse_ml_string    },
+		{ "#parse_time",         test_parse_time         },
+		{ "#parse_datetime",     test_parse_datetime     },
+    { "#parse_entry",        test_parse_entry        },
+    { "#parse_inline_table", test_parse_inline_table },
+    { "#parse_array",        test_parse_array        },
 		CU_TEST_INFO_NULL
 	};
 	CU_SuiteInfo suites[] = {
