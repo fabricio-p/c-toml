@@ -10,7 +10,7 @@
 
 typedef _Bool bool;
 
-__inline__
+/* __inline__
 StringBuffer read_file(char *path, int *size_p)
 {
   FILE *fp = fopen(path, "r");
@@ -25,7 +25,7 @@ StringBuffer read_file(char *path, int *size_p)
   fclose(fp);
   *size_p = size;
   return text;
-}
+} */
 #define in_range(c, x, y) (((c) >= (x)) && ((c) <= (y)))
 
 #define is_letter(c)                              \

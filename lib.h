@@ -52,33 +52,37 @@ typedef uint8_t TOMLKind;
 #define TOML_E_INVALID_KEY          7
 #define TOML_E_INVALID_VALUE        8
 #define TOML_E_ARRAY                9
-#define TOML_E_UNEXPECTED_CHAR      10
-#define TOML_E_INVALID_ESCAPE       11
-#define TOML_E_COMMA_OR_BRACKET     12
-#define TOML_E_INVALID_DATE         13
-#define TOML_E_INVALID_TIME         14
-#define TOML_E_INVALID_DATETIME     15
-#define TOML_E_INVALID_HEX_ESCAPE   16
-#define TOML_E_EXPECTED_TABLE_VALUE 17
-#define TOML_E_DUPLICATE_KEY        18
-#define TOML_E_EOF                  19
+#define TOML_E_INLINE_TABLE         10
+#define TOML_E_UNEXPECTED_CHAR      11
+#define TOML_E_INVALID_ESCAPE       12
+#define TOML_E_COMMA_OR_BRACKET     13
+#define TOML_E_INVALID_DATE         14
+#define TOML_E_INVALID_TIME         15
+#define TOML_E_INVALID_DATETIME     16
+#define TOML_E_INVALID_HEX_ESCAPE   17
+#define TOML_E_EXPECTED_TABLE_VALUE 18
+#define TOML_E_DUPLICATE_KEY        19
+#define TOML_E_ENTRY_EXPECTED       20
+#define TOML_E_ENTRY_UNEXPECTED     21
+#define TOML_E_ENTRY_INCOMPLETE     22
+#define TOML_E_EOF                  23
 
 // Typedefing the structs before defining their bodies
-typedef struct TOMLDate     TOMLDate;
-typedef struct TOMLTime     TOMLTime;
-typedef struct TOMLDateTime TOMLDateTime;
-typedef struct TOMLValue    TOMLValue;
-typedef struct TOMLEntry    TOMLEntry; // table key-value pair
-typedef struct TOMLCtx      TOMLCtx; // more like parsing state
-typedef struct TOMLPosition TOMLPosition; // position of the cursor
+typedef struct TOMLDate         TOMLDate;
+typedef struct TOMLTime         TOMLTime;
+typedef struct TOMLDateTime     TOMLDateTime;
+typedef struct TOMLValue        TOMLValue;
+typedef struct TOMLCtx          TOMLCtx; // more like parsing state
+typedef struct TOMLPosition     TOMLPosition; // position of the cursor
 // Typedefing array types
 typedef struct TOMLValue*   TOMLArray;
-//the table
-typedef struct TOMLEntry*   TOMLTable; // similiar mechanics to c-vector
+// The table
+typedef struct TOMLTable_Bucket TOMLTable_Bucket;
+typedef struct TOMLTable_Bucket *TOMLTable;
 // and the status thing
-typedef signed long TOMLStatus; // determines success or the error kind
+typedef signed int TOMLStatus; // determines success or the error kind
 
-void TOMLValue_print(TOMLValue const *, int, int);
+void TOMLValue_print(TOMLValue const *, int);
 
 struct TOMLTime {
   uint16_t millisec;
@@ -89,13 +93,13 @@ struct TOMLTime {
   // [1] = <hour>
   // [2] = <minutes>
   int8_t   z[3];
-};
+}__attribute__((packed));
 
 struct TOMLDate {
   uint16_t year;
   uint8_t  month;
   uint8_t  day;
-};
+}__attribute__((packed));
 
 struct TOMLDateTime {
   TOMLDate date;
@@ -115,11 +119,6 @@ struct TOMLValue {
     TOMLDateTime datetime;
   };
   TOMLKind kind;
-};
-
-struct TOMLEntry {
-  String    key;
-  TOMLValue value;
 };
 
 #define CVECTOR_POINTERMODE
@@ -143,9 +142,8 @@ struct TOMLPosition {
 
 TOMLStatus  TOML_init           (TOMLCtx *, char *);
 /* TOMLStatus  TOML_parse           (TOMLCtx *, TOMLTable *);
-TOMLStatus  TOML_parse_table      (TOMLCtx *, TOMLTable *);
-TOMLStatus  TOML_prse_inline_table(TOMLCtx *, TOMLTable *);
-TOMLStatus  TOML_parse_entry      (TOMLCtx *, TOMLEntry *); */
+TOMLStatus  TOML_parse_table      (TOMLCtx *, TOMLTable *); */
+TOMLStatus  TOML_parse_inline_table(TOMLCtx *, TOMLTable *);
 
 // Checks and invokes the right parser function.
 TOMLStatus  TOML_parse_value      (TOMLCtx *, TOMLValue *);

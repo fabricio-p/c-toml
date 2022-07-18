@@ -1,3 +1,4 @@
+.*.sw*
 *.o
 /test/*_test
 /tmp
