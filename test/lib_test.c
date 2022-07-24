@@ -279,17 +279,15 @@ void test_parse_array(void)
 	CU_ASSERT_EQUAL_FATAL(position.column, 17);
 	TOMLArray_destroy(arr);
 
-  //system("clear");
+  arr = NULL;
 	ctx = make_toml(
 		"[44, 3433, [\"bar\", 3.4339], 232.9, 977, [[38, 88], \n"
 		"[\"nested\", [\"more nested\", 34.38], 96.65, 836521], 232],\n"
 		"\"a lot of nesting, don't you think so?\", [true, false]]",
 		0
 	);
-  TOMLStatus s = TOML_parse_array(&ctx, &arr);
+	CU_ASSERT_EQUAL_FATAL(TOML_parse_array(&ctx, &arr), TOML_E_OK);
 	position = TOML_position(&ctx);
-	CU_ASSERT_EQUAL_FATAL(s, TOML_E_OK);
-	// print_value(&arr, 0);
 	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr), 8);
 
 	CU_ASSERT_EQUAL_FATAL(arr[0].kind, TOML_INTEGER);
@@ -298,7 +296,7 @@ void test_parse_array(void)
 	CU_ASSERT_EQUAL_FATAL(arr[1].kind, TOML_INTEGER);
 	CU_ASSERT_EQUAL_FATAL(arr[1].integer, 3433);
 
-	// Asserting nested array and it's items.
+	// Asserting nested array and its items.
 	CU_ASSERT_EQUAL_FATAL(arr[2].kind, TOML_ARRAY);
 	TOMLArray arr1 = arr[2].array;
 	CU_ASSERT_EQUAL_FATAL(TOMLArray_len(arr1), 2);
@@ -335,7 +333,6 @@ void test_parse_array(void)
 
 	CU_ASSERT_EQUAL_FATAL(arr4[0].kind, TOML_STRING);
 	CU_ASSERT_STRING_EQUAL_FATAL(arr4[0].string, "nested");
-	String_cleanup(arr4[0].string);
 
 	CU_ASSERT_EQUAL_FATAL(arr4[1].kind, TOML_ARRAY);
 	TOMLArray arr5 = arr4[1].array;
@@ -521,6 +518,18 @@ void test_parse_inline_table(void)
       true
   );
   val_p = TOMLTable_get(table, (String)"a");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
+  val_p = TOMLTable_get(val_p->table, (String)"b");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_TABLE);
+  val_p = TOMLTable_get(val_p->table, (String)"c");
+  CU_ASSERT_PTR_NOT_NULL_FATAL(val_p);
+  CU_ASSERT_EQUAL_FATAL(val_p->kind, TOML_ARRAY);
+  CU_ASSERT_EQUAL_FATAL(val_p->array[0].kind, TOML_FLOAT);
+  CU_ASSERT_TRUE(__builtin_isnan(val_p->array[0].float_));
+  CU_ASSERT_EQUAL_FATAL(val_p->array[1].kind, TOML_FLOAT);
+  CU_ASSERT_TRUE(__builtin_isinf(val_p->array[1].float_));
   TOMLTable_destroy(table);
 }
 
@@ -533,9 +542,9 @@ int main(int argc, char **argv)
 		{ "#parse_ml_string",    test_parse_ml_string    },
 		{ "#parse_time",         test_parse_time         },
 		{ "#parse_datetime",     test_parse_datetime     },
+    { "#parse_array",        test_parse_array        },
     { "#parse_entry",        test_parse_entry        },
     { "#parse_inline_table", test_parse_inline_table },
-    { "#parse_array",        test_parse_array        },
 		CU_TEST_INFO_NULL
 	};
 	CU_SuiteInfo suites[] = {

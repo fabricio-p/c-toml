@@ -8,10 +8,12 @@ CFLAGS += -std=c99 -I . -I cake_libs/																	\
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition	\
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs		\
 		  		-Wno-unused-parameter -Wno-unused-command-line-argument			\
-		  		-Wno-missing-braces -Wno-unused-function -O3
+		  		-Wno-missing-braces -Wno-unused-function
 
-ifeq ($(MODE), debug)
-	CLFAGS += -DDEBUG -O0 -ggdb
+ifeq ($(MODE),debug)
+	CFLAGS += -DDEBUG -O0 -ggdb
+else
+	CFLAGS += -O3
 endif
 
 .PHONY: all tests clean
