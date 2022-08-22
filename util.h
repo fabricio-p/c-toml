@@ -36,7 +36,7 @@ StringBuffer read_file(char *path, int *size_p)
 #define is_hex(c)                                                 \
   (is_digit(c) || in_range(c, 'A', 'F') || in_range(c, 'a', 'f'))
 
-#define is_empty(c)                                         \
-  ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\0')
+#define is_empty(c)                           \
+  ((c) == ' ' || (c) == '\t' || (c) == '\n')
 
 #endif /* C_TOML_UTIL_H */

@@ -6,3 +6,5 @@
 /bin
 *.log
 visualizer.py
+genstatusdefs.bash
+status_list.txt

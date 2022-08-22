@@ -73,13 +73,6 @@ static TOMLTable_Bucket *get_bucket(TOMLTable hmap, String key,
   return NULL;
 }
 
-TOMLTable_Bucket *get_bucket_(TOMLTable hmap, String key,
-                             uint32_t *hash_p)
-{
-  return get_bucket(hmap, key, hash_p);
-}
-
-
 TOMLValue const *TOMLTable_get(TOMLTable hmap, String key)
 {
   TOMLTable_Bucket *bucket = get_bucket(hmap, key, NULL);
