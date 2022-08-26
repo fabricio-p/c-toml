@@ -163,7 +163,9 @@ void TOMLValue_print(TOMLValue const *value, int indent)
       TOMLTable_Bucket const *current = &(value->table[0]);
       TOMLTable_Bucket const *const end = current +
                                           TOMLTable_size(value->table);
-      puts("{");
+      printf("<<size: %d, count: %d>> {\n",
+             TOMLTable_size(value->table),
+             TOMLTable_count(value->table));
       for (; current < end; ++(current))
       {
         if (current->key != NULL)
@@ -185,6 +187,10 @@ void TOMLValue_print(TOMLValue const *value, int indent)
       putchar('}');
       break;
     }
+  }
+  if (indent == 0)
+  {
+    putchar('\n');
   }
 }
 
@@ -859,11 +865,11 @@ static TOMLStatus parse_key(TOMLCtx *ctx, String *key)
     for (; (offset < end) &&
            (is_letter(c) || is_digit(c) || c == '_' || c == '-'); )
     {
-      StringBuffer_push(key, c);
+      StringBuffer_push((StringBuffer *)key, c);
       c = *(++(offset));
     }
     ctx->offset = offset;
-    StringBuffer_transform_to_string(key);
+    StringBuffer_transform_to_string((StringBuffer *)key);
     return TOML_E_OK;
   }
 }
@@ -999,7 +1005,7 @@ TOMLStatus TOML_parse_table_header(TOMLCtx *ctx, TOMLTable *table_p,
     } else if (*ctx->offset == '#')
     {
       skip_comment(ctx->offset);
-    } else
+    } else if (*ctx->offset != ']')
     {
       throw(INVALID_HEADER);
     }

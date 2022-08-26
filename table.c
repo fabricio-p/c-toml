@@ -33,8 +33,8 @@ static int TOMLTable_expand(TOMLTable *hmap_p)
   {
     if (offset->key != NULL)
     {
-      if ((status = TOMLTable_insert(&new_map, offset->key,
-                                     &(offset->value))))
+      status = TOMLTable_insert(&new_map, offset->key, &(offset->value));
+      if (status != 0)
       {
         TOMLTable_cleanup(new_map);
         return status;
@@ -55,7 +55,7 @@ static TOMLTable_Bucket *get_bucket(TOMLTable hmap, String key,
     return NULL;
   }
   TOMLTable_Bucket *end = &(hmap[size]);
-  uint32_t hash = XXH32(key, strlen(key), 0);
+  uint32_t hash = XXH32(key, String_len(key), 0);
   size_t index = hash % size;
   TOMLTable_Bucket *offset = &(hmap[index]);
   if (hash_p != NULL)
@@ -93,12 +93,13 @@ TOMLValue *TOMLTable_put_extra(TOMLTable *hmap_p, String key, int store)
             TOMLTable_expand(hmap_p) == 0);
   if (bucket != NULL && (hdr->count * 2) <= hdr->size)
   {
-    if (!bucket->hash && store)
+    if (bucket->hash == 0 && store == 1)
     {
       bucket->hash = hash;
       bucket->key = key;
       ++(hdr->count);
       bucket->value.float_ = 0;
+      bucket->value.kind = 0;
     }
     val_p = &(bucket->value);
   }
@@ -108,22 +109,15 @@ TOMLValue *TOMLTable_put_extra(TOMLTable *hmap_p, String key, int store)
 int TOMLTable_insert(TOMLTable *hmap_p, String key,
                      TOMLValue const *val_ps)
 {
-  TOMLValue *val_pd = TOMLTable_put_extra(hmap_p, key, 0);
-  TOMLTable_Bucket *bucket = (void *)val_pd -
-                             offsetof(TOMLTable_Bucket, value);
-  int status = 0;
+  TOMLValue *val_pd = TOMLTable_put_extra(hmap_p, key, 1);
   if (val_pd != NULL)
   {
-    if (bucket->hash)
-    {
-      status = 1;
-    }
     *val_pd = *val_ps;
+    return 0;
   } else
   {
-    status = -1;
+    return -1;
   }
-  return status;
 }
 
 int TOMLTable_has_key(TOMLTable hmap, String key)
