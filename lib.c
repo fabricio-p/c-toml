@@ -10,6 +10,13 @@
 // TODO: Implement my owm integer and double parsing functions
 //       instead of using strtol and strtod
 
+// TODO: Refactor [TOML_parse_time]
+
+// TODO: In(TOML_parse_value.inf_check) ->
+//        Do nan and inf parsing without sign prefix
+
+// TODO: Implement parsing of whole TOML files and test it
+
 #define throw(err) { status = TOML_E_##err; goto catch; }
 #define try(thing) { status = (thing); if (status) { goto catch; } }
 #define try_cond(cond, err) if (!(cond)) { try(TOML_E_##err); }
@@ -802,7 +809,6 @@ TOMLStatus TOML_parse_value(TOMLCtx *ctx, TOMLValue *value)
     CASE('-')
     {
       ++(ctx->offset);
-      // TODO: Do nan and inf parsing without sign prefix
 inf_check:
       if (ctx->offset[0] == 'i' && ctx->offset[1] == 'n' &&
           ctx->offset[2] == 'f')
@@ -885,11 +891,11 @@ TOMLStatus TOML_parse_entry(TOMLCtx *ctx, TOMLTable *table_p)
   {
     try(parse_key(ctx, &key));
     offset = ctx->offset;
+    TOMLValue *val_p = TOMLTable_put(table_p, key);
     for (int running = 1; running; )
     {
       ctx->offset = offset;
       char chr = *offset;
-      TOMLValue *val_p = TOMLTable_put(table_p, key);
       if (chr == '.')
       {
         if (val_p->kind == 0)
@@ -900,6 +906,7 @@ TOMLStatus TOML_parse_entry(TOMLCtx *ctx, TOMLTable *table_p)
         {
           throw_if(val_p->kind != TOML_TABLE, EXPECTED_TABLE);
           String_cleanup(key);
+          key = NULL;
         }
         table_p = &(val_p->table);
         ++(offset);
@@ -981,7 +988,7 @@ TOMLStatus TOML_parse_table_header(TOMLCtx *ctx, TOMLTable *table_p,
 {
   TOMLStatus status = TOML_E_OK;
   String key = NULL;
-  for (; *ctx->offset != ']'; )
+  for (; ctx->offset < ctx->end && *ctx->offset != ']'; )
   {
     try(parse_key(ctx, &(key)));
     if (*ctx->offset == '.')
@@ -1054,14 +1061,14 @@ TOMLStatus TOML_parse_table(TOMLCtx *ctx, TOMLTable *table_p)
   TOMLStatus status = TOML_E_OK;
   ++(ctx->offset);
   int is_tblarr = 0;
-  if (ctx->offset[1] == ']')
+  if (*ctx->offset == '[')
   {
     ++(ctx->offset);
     is_tblarr = 1;
   }
   TOMLTable *this_table = NULL;
   try(TOML_parse_table_header(ctx, table_p, &this_table, is_tblarr));
-  for (; *ctx->offset != '['; )
+  for (; ctx->offset < ctx->end && *ctx->offset != '['; )
   {
     if (is_empty(*ctx->offset))
     {
