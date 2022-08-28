@@ -950,6 +950,182 @@ void test_parse_table(void)
   TOMLTable_destroy(table);
 }
 
+void test_parse(void)
+{
+  TOMLCtx ctx;
+  TOMLTable table = TOMLTable_new();
+
+  ctx = make_toml("foo = \"bar\"\n"
+                  "# comment\n"
+                  "[bar]\n"
+                  "baz = 42\n"
+                  "[['a'.\"b c\"]]\n"
+                  "d.e = 13.62\n"
+                  "off = true\n"
+                  "[['a'.\"b c\"]]\n"
+                  "on = false\n"
+                  "inf = inf\n"
+                  "nan = nan", 0);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse(&ctx, &table), TOML_E_OK);
+  CU_ASSERT_EQUAL_FATAL(TOMLTable_count(table), 3);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(TBLGET(table, "foo"));
+  CU_ASSERT_EQUAL_FATAL(TBLGET(table, "foo")->kind, TOML_STRING);
+  CU_ASSERT_FATAL(
+      String_equal(TBLGET(table, "foo")->string, String_fake("bar"))
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(TBLGET(table, "bar"));
+  CU_ASSERT_EQUAL_FATAL(TBLGET(table, "bar")->kind, TOML_TABLE);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(TBLGET(table, "bar")->table);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(TBLGET(table, "bar")->table, "baz")
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(TBLGET(table, "bar")->table, "baz")->kind, TOML_INTEGER
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(TBLGET(table, "bar")->table, "baz")->integer, 42
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(TBLGET(table, "a"));
+  CU_ASSERT_EQUAL_FATAL(TBLGET(table, "a")->kind, TOML_TABLE);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(TBLGET(table, "a")->table);
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(TBLGET(table, "a")->table, "b c")
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(TBLGET(table, "a")->table, "b c")->kind, TOML_TABLE_ARRAY
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TOMLArray_len(TBLGET(TBLGET(table, "a")->table, "b c")->array), 2
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(TBLGET(table, "a")->table, "b c")->array[0].kind,
+      TOML_TABLE
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "d"
+      )
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "d"
+      )->kind,
+      TOML_TABLE
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "d"
+      )->table
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(
+        TBLGET(
+          TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "d"
+        )->table,
+        "e"
+      )
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(
+        TBLGET(
+          TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "d"
+        )->table,
+        "e"
+      )->kind,
+      TOML_FLOAT
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(
+        TBLGET(
+          TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "d"
+        )->table,
+        "e"
+      )->float_,
+      13.62
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "d"
+      )
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "off"
+      )->kind,
+      TOML_BOOLEAN
+  );
+  CU_ASSERT_TRUE_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[0].table, "off"
+      )->boolean
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(TBLGET(table, "a")->table, "b c")->array[1].kind,
+      TOML_TABLE
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "on"
+      )
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "on"
+      )->kind,
+      TOML_BOOLEAN
+  );
+  CU_ASSERT_FALSE_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "on"
+      )->boolean
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "inf"
+      )
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "inf"
+      )->kind,
+      TOML_FLOAT
+  );
+  CU_ASSERT_FATAL(
+      __builtin_isinf(
+        TBLGET(
+          TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "inf"
+        )->float_
+      )
+  );
+  CU_ASSERT_PTR_NOT_NULL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "nan"
+      )
+  );
+  CU_ASSERT_EQUAL_FATAL(
+      TBLGET(
+        TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "nan"
+      )->kind,
+      TOML_FLOAT
+  );
+  CU_ASSERT_FATAL(
+      __builtin_isnan(
+        TBLGET(
+          TBLGET(TBLGET(table, "a")->table, "b c")->array[1].table, "nan"
+        )->float_
+      )
+  );
+  TOMLValue_print(&(TOMLValue) {.kind=TOML_TABLE, .table=table}, 0);
+
+  TOMLTable_destroy(table);
+}
+
 int main(int argc, char **argv)
 {
   int status = 0;
@@ -964,6 +1140,7 @@ int main(int argc, char **argv)
     { "#parse_inline_table", test_parse_inline_table },
     { "#parse_table_header", test_parse_table_header },
     { "#parse_table",        test_parse_table        },
+    { "#parse",              test_parse              },
     CU_TEST_INFO_NULL
   };
   CU_SuiteInfo suites[] = {
