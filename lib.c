@@ -17,6 +17,9 @@
 
 // TODO: Implement parsing of whole TOML files and test it
 
+// XXX: Consider unitype arrays
+
+
 #define throw(err) { status = TOML_E_##err; goto catch; }
 #define try(thing) { status = (thing); if (status) { goto catch; } }
 #define try_cond(cond, err) if (!(cond)) { try(TOML_E_##err); }
@@ -127,8 +130,8 @@ void TOMLValue_print(TOMLValue const *value, int indent)
            ANSIQ_SETFG_YELLOW "%lF" ANSIQ_GR_RESET,
            value->float_);
     SIMPLE(BOOLEAN,
-           ANSIQ_SETFG_RED "%s" ANSIQ_GR_RESET,
-           value->integer ? "1" : "0");
+           ANSIQ_SETBRIGHT_FG(RED) "%s" ANSIQ_GR_RESET,
+           value->integer ? "true" : "false");
     SIMPLE(STRING,
            ANSIQ_SETFG_GREEN "\"%.*s\"" ANSIQ_GR_RESET,
            String_len(value->string), value->string);
@@ -170,9 +173,7 @@ void TOMLValue_print(TOMLValue const *value, int indent)
       TOMLTable_Bucket const *current = &(value->table[0]);
       TOMLTable_Bucket const *const end = current +
                                           TOMLTable_size(value->table);
-      printf("<<size: %d, count: %d>> {\n",
-             TOMLTable_size(value->table),
-             TOMLTable_count(value->table));
+      puts("{");
       for (; current < end; ++(current))
       {
         if (current->key != NULL)
@@ -1076,6 +1077,29 @@ TOMLStatus TOML_parse_table(TOMLCtx *ctx, TOMLTable *table_p)
     } else
     {
       try(TOML_parse_entry(ctx, this_table));
+    }
+  }
+catch:
+  return status;
+}
+
+TOMLStatus TOML_parse(TOMLCtx *ctx, TOMLTable *table_p)
+{
+  TOMLStatus status = TOML_E_OK;
+  for (; ctx->offset < ctx->end; )
+  {
+    if (is_empty(*ctx->offset))
+    {
+      ++(ctx->offset);
+    } else if (*ctx->offset == '#')
+    {
+      skip_comment(ctx->offset);
+    } else if (*ctx->offset == '[')
+    {
+      try(TOML_parse_table(ctx, table_p));
+    } else
+    {
+      try(TOML_parse_entry(ctx, table_p));
     }
   }
 catch:

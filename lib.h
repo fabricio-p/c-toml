@@ -146,7 +146,6 @@ struct TOMLPosition {
 };
 
 TOMLStatus  TOML_init              (TOMLCtx *, char *);
-/* TOMLStatus  TOML_parse            (TOMLCtx *, TOMLTable *); */
 
 // Checks and invokes the right parser function.
 TOMLStatus  TOML_parse_value       (TOMLCtx *, TOMLValue *);
@@ -160,10 +159,11 @@ TOMLStatus  TOML_parse_datetime    (TOMLCtx *, TOMLValue *);
 // Like above, we know it's an array.
 TOMLStatus  TOML_parse_array       (TOMLCtx *, TOMLArray *);
 TOMLStatus  TOML_parse_entry       (TOMLCtx *, TOMLTable *);
-TOMLStatus  TOML_parse_inline_table (TOMLCtx *, TOMLTable *);
+TOMLStatus  TOML_parse_inline_table(TOMLCtx *, TOMLTable *);
 TOMLStatus  TOML_parse_table_header(TOMLCtx *, TOMLTable *,
                                     TOMLTable **, int);
 TOMLStatus  TOML_parse_table       (TOMLCtx *, TOMLTable *);
+TOMLStatus  TOML_parse             (TOMLCtx *, TOMLTable *);
 
 void TOMLValue_destroy(TOMLValue *);
 TOMLPosition TOML_position(TOMLCtx const *);
