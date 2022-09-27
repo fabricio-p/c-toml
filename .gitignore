@@ -1,9 +1,9 @@
 .*.sw*
 *.o
-/test/*_test
 /tmp
+/build
+/build/*
 /cake_libs
-/bin
 *.log
 visualizer.py
 genstatusdefs.bash

@@ -7,6 +7,7 @@ current_dir=`pwd`
 cd cake_libs
 git clone https://github.com/fabriciopashaj/c-string
 git clone https://github.com/fabriciopashaj/c-vector
+git clone https://github.com/fabriciopashaj/c-ansi-sequences
 
 cd $current_dir
 

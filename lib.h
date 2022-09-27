@@ -147,6 +147,7 @@ struct TOMLPosition {
 
 TOMLStatus  TOML_init              (TOMLCtx *, char *);
 
+// TOMLStatus  TOML_parse_int       (char const **, char const *, int,  int, signed long *);
 // Checks and invokes the right parser function.
 TOMLStatus  TOML_parse_value       (TOMLCtx *, TOMLValue *);
 // It can be an integer or a float, we don't know before we parse it.

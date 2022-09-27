@@ -50,7 +50,7 @@ void test_parse_number(void)
   TOMLPosition position;
   TOMLValue value;
 
-  TOML_parse_number(&ctx, &value);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_number(&ctx, &value), TOML_E_OK);
   position = TOML_position(&ctx);
   CU_ASSERT_EQUAL_FATAL(value.kind, TOML_INTEGER);
   CU_ASSERT_EQUAL_FATAL(value.integer, 3475);
@@ -66,7 +66,7 @@ void test_parse_number(void)
   CU_ASSERT_EQUAL_FATAL(position.column, 7);
 
   ctx = make_toml(" +126_583", 1);
-  TOML_parse_number(&ctx, &value);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_number(&ctx, &value), TOML_E_OK);
   position = TOML_position(&ctx);
   CU_ASSERT_EQUAL_FATAL(value.kind, TOML_INTEGER);
   CU_ASSERT_EQUAL_FATAL(value.integer, 126583);
@@ -74,7 +74,7 @@ void test_parse_number(void)
   CU_ASSERT_EQUAL_FATAL(position.column, 9);
 
   ctx = make_toml("0xff", 0);
-  TOML_parse_number(&ctx, &value);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_number(&ctx, &value), TOML_E_OK);
   position = TOML_position(&ctx);
   CU_ASSERT_EQUAL_FATAL(value.kind, TOML_INTEGER);
   CU_ASSERT_EQUAL_FATAL(value.integer, 0xff);
@@ -374,7 +374,7 @@ void test_parse_array(void)
   CU_ASSERT_EQUAL_FATAL(position.line, 3);
 
   ctx = make_toml("[2021-12-11, 17:16:00+01]", 0);
-  TOML_parse_array(&ctx, &arr);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_array(&ctx, &arr), TOML_E_OK);
   position = TOML_position(&ctx);
   CU_ASSERT_EQUAL_FATAL(position.offset, 25);
   CU_ASSERT_EQUAL_FATAL(position.column, 25);
@@ -1121,7 +1121,6 @@ void test_parse(void)
         )->float_
       )
   );
-  TOMLValue_print(&(TOMLValue) {.kind=TOML_TABLE, .table=table}, 0);
 
   TOMLTable_destroy(table);
 }
