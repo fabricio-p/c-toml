@@ -17,6 +17,8 @@
 // TODO: In(TOML_parse_value.inf_check) ->
 //        Do nan and inf parsing without sign prefix
 
+// TODO: [TOML_parse_{time, datetime}] Ditch offset
+
 // XXX: Consider unitype arrays
 
 
@@ -32,15 +34,21 @@
     offset = nln == NULL ? ctx->end : (nln);  \
   } while (0);
 
+#define PARSE_INT_NEG (1 << 0)
+#define PARSE_INT_ILZ (1 << 1) // (I)gnore (L)eading (Z)eroes
 static TOMLStatus parse_int(
-  char const **buf_p, char const *end, int base, int neg, signed long *res_p
+  char const **buf_p, char const *end, int base, int info, signed long *res_p
 )
 {
   TOMLStatus status = TOML_E_OK;
   char const *buf = *buf_p;
-  signed long cutlim = ((neg ? LONG_MIN : LONG_MAX) % base);
-  signed long cutoff = (neg ? LONG_MIN : LONG_MAX) - cutlim;
+  signed long cutlim = ((info & PARSE_INT_NEG ? LONG_MIN : LONG_MAX) % base);
+  signed long cutoff = (info & PARSE_INT_NEG ? LONG_MIN : LONG_MAX) - cutlim;
   register signed long acc = 0;
+  if (info & PARSE_INT_ILZ)
+  {
+    for (; buf[0] == '0' && buf[1] == '0'; ++buf) {}
+  }
   for (; buf < end; ++(buf))
   {
     char c = *buf;
@@ -93,39 +101,8 @@ static TOMLStatus parse_int(
     }
   }
   *buf_p = buf;
-  *res_p = neg ? -acc : acc;
+  *res_p = info & PARSE_INT_NEG ? -acc : acc;
   return status;
-}
-
-#if 0
-static TOMLStatus parse_float(
-  char const **buf_p, char const *end, int neg, double *res_p
-)
-{
-  TOMLStatus status = TOML_E_OK;
-  char const *buf = *buf_p;
-  signed long cutlim = ((neg ? LONG_MIN : LONG_MAX) % base);
-  signed long cutoff = (neg ? LONG_MIN : LONG_MAX) - cutlim;
-  register double acc = 0;
-  for (; buf < end; ++(buf))
-  {
-    char c = *buf;
-  }
-}
-#endif /* 0 */
-
-void collect_millis(char const **offset_p, char *buff, int n)
-{
-  char const *offset = *offset_p;
-  char c;
-  for (int i = 1; (c = *offset) && is_digit(c); ++(i), ++(offset))
-  {
-    if (i <= n)
-    {
-      *(buff++) = *offset;
-    }
-  }
-  *offset_p = offset;
 }
 
 void TOMLValue_destroy(TOMLValue *val)
@@ -341,7 +318,11 @@ metadata:
       goto metadata;
     }
   }
-  try(parse_int(&(ctx->offset), end, base, neg, &(value->integer)));
+  try(
+      parse_int(
+        &(ctx->offset), end, base, neg ? PARSE_INT_NEG : 0, &(value->integer)
+      )
+  );
   if (
     base == 10
     && ctx->offset < ctx->end
@@ -350,14 +331,20 @@ metadata:
   )
   {
     ++(ctx->offset);
-    int lzc = 0; // leading zero count
-    for (; *ctx->offset == '0'; ++(ctx->offset), ++(lzc)) {}
     double float_ = (double)value->integer;
     signed long frac_int = 0;
     char const *offset = ctx->offset;
-    try(parse_int(&(ctx->offset), end, 10, neg, &(frac_int)));
+    try(
+        parse_int(
+          &(ctx->offset),
+          end,
+          10,
+          (neg ? PARSE_INT_NEG : 0)|PARSE_INT_ILZ,
+          &(frac_int)
+        )
+    );
     double frac = (double)frac_int;
-    for (int i = 0, frac_len = lzc + (ctx->offset - offset); i < frac_len; ++i)
+    for (int i = 0, frac_len = ctx->offset - offset; i < frac_len; ++i)
     {
       frac /= 10;
     }
@@ -425,11 +412,14 @@ catch:
   CASE('u')                                                   \
   CASE('U')                                                   \
   {                                                           \
-    char c0 = *(++(offset));                                  \
-    char c1 = offset[1];                                      \
-    char num[3] = {c0, c1, 0};                                \
-    throw_if(!is_hex(c0) || !is_hex(c1), INVALID_HEX_ESCAPE); \
-    chr = strtoul(num, NULL, 16);                             \
+    ++(offset);                                               \
+    throw_if(                                                 \
+        !is_hex(offset[0]) || !is_hex(offset[1]),             \
+        INVALID_HEX_ESCAPE                                    \
+    );                                                        \
+    signed long charcode = 0;                                 \
+    parse_int(&offset, offset + 2, 16, 0, &(charcode));       \
+    chr = (char)charcode;                                     \
     break;                                                    \
   }                                                           \
   CASE('\\')                                                  \
@@ -574,89 +564,59 @@ TOMLStatus TOML_parse_time(TOMLCtx *ctx, TOMLTime *time)
   TOMLStatus status = TOML_E_OK;
   char const *offset = ctx->offset;
   char const *const end = ctx->end;
-  try_cond(offset + 8 <= end && offset[2] == ':' && offset[5] == ':',
-           INVALID_TIME);
+  signed long parsed_num = 0;
 
-  int const hour = strtoul(offset, (char **)&offset, 10);
-  throw_if(*offset != ':', INVALID_TIME);
+  try_cond(
+      offset + 8 <= end && offset[2] == ':' && offset[5] == ':', INVALID_TIME
+  );
+
+  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  register int const hour = (int)parsed_num;
+  throw_if(ctx->offset + 2 != offset, INVALID_TIME);
   ++(offset);
 
-  int const min = strtoul(offset, (char **)&offset, 10);
-  throw_if(*offset != ':', INVALID_TIME);
+  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  register int const min = (int)parsed_num;
+  throw_if(ctx->offset + 5 != offset, INVALID_TIME);
+  ++(offset);
 
-  char const *const old_offset = ++(offset);
-  int const sec = strtoul(offset, (char **)&offset, 10);
+  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  register int const sec = (int)parsed_num;
+  throw_if(ctx->offset + 8 != offset, INVALID_TIME);
 
-  int millisec = 0;
+  register int millisec = 0;
   int8_t z[3] = {0, -1, -1};
-  if (offset == NULL)
+  if (*offset == '.')
   {
-    offset = end;
-  } else
+    ++(offset);
+    parse_int(&(offset), offset + 5, 10, PARSE_INT_ILZ, &(parsed_num));
+    millisec = (int)parsed_num;
+  }
+  switch (*offset)
   {
-    throw_if(offset < old_offset + 2, INVALID_TIME);
-    if (*offset == '.')
+    CASE('z')
+    CASE('Z')
     {
+      // if it's a 'z'/'Z' we just put 'Z' and exit from switch
+      z[0] = 'Z';
       ++(offset);
-      char _ms_buff[4] = { [3] = '\0' };
-      collect_millis(&offset, _ms_buff, 3);
-      millisec = strtoul(_ms_buff, NULL, 10);
-      throw_if(errno == ERANGE, INT_OVERFLOW);
-    }
-    switch (*offset)
+    } break;
+    CASE('+')
+    CASE('-')
     {
-      CASE('z')
-      CASE('Z')
+      // we put the one we have in buffer
+      z[0] = *((offset)++);
+      try_cond(offset + 2 <= end, INVALID_TIME);
+      parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+      z[1] = (uint8_t)parsed_num;
+      if (offset < end && *offset == ':')
       {
-        // if it's a 'z'/'Z' we just put 'Z' and exit from switch
-        z[0] = 'Z';
         ++(offset);
-      } break;
-      CASE('+')
-      CASE('-')
-      {
-        // we put the one we have in buffer
-        z[0] = *offset++;
-        // the buffer that will be used by strtoul()
-        char _b[4] = { [2] = 0 };
-        char *_p = NULL;
-        _b[0] = *offset++;
-        _b[1] = *offset++;
-        if (_b[0] == '0')
-        {
-          _b[0] = _b[1];
-          _b[1] = '\0';
-        }
-        z[1] = strtoul(_b, &_p, 10);
-        if (_p != _b + (_b[1] == '\0' ? 1 : 2))
-        {
-          throw(INVALID_TIME);
-        } else if (errno == ERANGE)
-        {
-          throw(INT_OVERFLOW);
-        }
-        if (*offset == ':')
-        {
-          ++(offset);
-          _b[0] = *offset++;
-          _b[1] = *offset++;
-          if (_b[0] == '0')
-          {
-            _b[0] = _b[1];
-            _b[1] = '\0';
-          }
-          z[2] = strtoul(_b, &_p, 10);
-          if (_p != _b + (_b[1] == '\0' ? 1 : 2))
-          {
-            throw(INVALID_TIME);
-          } else if(errno == ERANGE)
-          {
-            throw(INT_OVERFLOW);
-          }
-        }
-        break;
+        try_cond(offset + 2 <= end, INVALID_TIME);
+        parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+        z[2] = (uint8_t)parsed_num;
       }
-    }
+    } break;
   }
   time->hour = hour;
   time->min = min;
@@ -674,25 +634,26 @@ TOMLStatus TOML_parse_datetime(TOMLCtx *ctx, TOMLValue *value)
   TOMLStatus status = TOML_E_OK;
   char const *offset = ctx->offset;
   char const *const end = ctx->end;
-  try_cond(offset + 10 <= end && offset[4] == '-' && offset[7] == '-',
-           INVALID_DATE);
-  int const year = strtoul(offset, (char **)&offset, 10);
-  throw_if(*offset != '-', INVALID_DATE);
+  signed long parsed_num = 0;
+  try_cond(
+      offset + 10 <= end && offset[4] == '-' && offset[7] == '-', INVALID_DATE
+  );
+  parse_int(&(offset), offset + 4, 10, 0, &(parsed_num));
+  register int const year = (int)parsed_num;
+  throw_if(ctx->offset + 4 != offset, INVALID_DATE);
   ++(offset);
-  int const month = strtoul(offset, (char **)&offset, 10);
-  throw_if(*offset != '-', INVALID_DATE);
-  char const *const old_offset = ++(offset);
-  int const day = strtoul(offset, (char **)&offset, 10);
-  if (offset == NULL) // NULL means the EOS has been reached
-  {
-    offset = end;
-  } else
-  {
-    throw_if(offset < old_offset + 2, INVALID_DATE);
-  }
+
+  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  register int const month = (int)parsed_num;
+  throw_if(ctx->offset + 7 != offset, INVALID_DATE);
+  ++(offset);
+
+  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  register int const day = (int)parsed_num;
+
   char const current = *offset;
   TOMLDate *date;
-  if (current == 'T' || current == ' ')
+  if (offset < end && (current == 'T' || current == ' '))
   {
     ctx->offset = ++(offset);
     status = TOML_parse_time(ctx, &(value->datetime.time));

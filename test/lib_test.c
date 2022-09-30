@@ -213,7 +213,7 @@ void test_parse_time(void)
   CU_ASSERT_EQUAL_FATAL(time.hour, 18);
   CU_ASSERT_EQUAL_FATAL(time.min, 45);
   CU_ASSERT_EQUAL_FATAL(time.sec, 28);
-  CU_ASSERT_EQUAL_FATAL(time.millisec, 574);
+  CU_ASSERT_EQUAL_FATAL(time.millisec, 57453);
 
   ctx = make_toml("18:54:00.12Z", 0);
   CU_ASSERT_EQUAL_FATAL(TOML_parse_time(&ctx, &time), TOML_E_OK);
@@ -230,7 +230,7 @@ void test_parse_time(void)
 void test_parse_datetime(void)
 {
   TOMLCtx ctx = make_toml("2021-12-03", 0);
-  TOMLValue value;
+  TOMLValue value = {0};
   CU_ASSERT_EQUAL_FATAL(TOML_parse_datetime(&ctx, &value), TOML_E_OK);
   CU_ASSERT_EQUAL_FATAL(value.kind, TOML_DATE);
   TOMLPosition position = TOML_position(&ctx);
@@ -241,6 +241,7 @@ void test_parse_datetime(void)
   CU_ASSERT_EQUAL_FATAL(value.date.day, 3);
 
   ctx = make_toml("2021-12-03T00:00:00", 0);
+  value = (TOMLValue) {0};
   CU_ASSERT_EQUAL_FATAL(TOML_parse_datetime(&ctx, &value), TOML_E_OK);
   CU_ASSERT_EQUAL_FATAL(value.kind, TOML_DATETIME);
   position = TOML_position(&ctx);
