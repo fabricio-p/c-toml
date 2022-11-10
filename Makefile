@@ -9,7 +9,8 @@ CFLAGS += -std=c99 -I . -I cake_libs/																	\
 					-Wredundant-decls -Wnested-externs -Wmissing-include-dirs		\
 					-Wno-unused-parameter -Wno-unused-command-line-argument			\
 					-Wno-missing-braces -Wno-unused-function										\
-					-Wno-strict-prototypes -Wno-old-style-definition
+					-Wno-strict-prototypes -Wno-old-style-definition						\
+					-Wimplicit-fallthrough=1
 LDFLAGS += -lcunit -lxxhash
 
 ifeq ($(MODE),debug)

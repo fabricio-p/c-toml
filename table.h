@@ -40,8 +40,4 @@ void TOMLTable_destroy(TOMLTable);
   (((TOMLTable_Header *)                                        \
     (((void *)(t)) - offsetof(TOMLTable_Header, items)))->count)
 
-TOMLTable_Bucket *get_bucket_(TOMLTable hmap, String key,
-                                    uint32_t *hash_p);
-
-
 #endif /* __TOML_TOMLTABLE_H__ */

@@ -8,18 +8,14 @@
 #include "lib.h"
 #include "util.h"
 
-// TODO: Refactor [TOML_parse_time]
+#define __fallthrough__ __attribute__((fallthrough))
+#define OFFSET (ctx->offset)
 
-// TODO: Refactor [TOML_parse_number.metadata]
+// TODO: [TOML_parse_number] Do more checks for value correctness,
+//                           Check for float overflows
 
-// TODO: [TOML_parse_number] Do more checks for value correctness
-
-// TODO: In(TOML_parse_value.inf_check) ->
-//        Do nan and inf parsing without sign prefix
-
-// TODO: [TOML_parse_{time, datetime}] Ditch offset
-
-// XXX: Consider unitype arrays
+// XXX: Consider implementing unitype arrays for memory efficiency,
+//        may need to sacrifice some performance
 
 
 #define throw(err) { status = TOML_E_##err; goto catch; }
@@ -130,7 +126,7 @@ void TOMLArray_destroy(TOMLArray array)
 
 TOMLPosition TOML_position(TOMLCtx const *ctx)
 {
-  const char *const offset = ctx->offset;
+  const char *const offset = OFFSET;
   int line_count = 1;
   char const *line_start = ctx->content;
   for (register char *chrp = ctx->content; chrp <= offset; ++(chrp))
@@ -237,8 +233,10 @@ void TOMLValue_print(TOMLValue const *value, int indent)
           {
             putchar(' ');
           }
-          printf(ANSIQ_SETFG_CYAN "%.*s" ANSIQ_GR_RESET " = ",
-                 String_len(current->key), current->key);
+          printf(
+              ANSIQ_SETFG_CYAN "%.*s" ANSIQ_GR_RESET " = ",
+              String_len(current->key), current->key
+          );
           TOMLValue_print(&(current->value), indent + 1);
           puts(current < end - 1 ? "," : "");
         }
@@ -263,80 +261,89 @@ TOMLStatus TOML_parse_number(TOMLCtx *ctx, TOMLValue *value)
   char const *const end = ctx->end;
   int neg = 0;
   int base = 10;
-  // TODO: Refactor
-metadata:
-  switch (*ctx->offset)
+  switch (*OFFSET)
   {
-    CASE('0')
-    {
-      switch (*(++(ctx->offset)))
-      {
-        CASE('x')
-        CASE('X')
-        {
-          ++(ctx->offset);
-          base = 16;
-        } break;
-        CASE('o')
-        CASE('O')
-        {
-          ++(ctx->offset);
-          base = 8;
-        } break;
-        CASE('b')
-        CASE('B')
-        {
-          ++(ctx->offset);
-          base = 2;
-        } break;
-        CASE('\n')
-        CASE('\t')
-        CASE(' ')
-        CASE('\0')
-        CASE('#')
-        {
-          value->kind = TOML_INTEGER;
-          value->integer = 0;
-          // we just jump at the end
-          throw(OK);
-        }
-        default:
-        {
-          throw(INVALID_NUMBER);
-        }
-      }
-    } break;
-    CASE('+')
-    {
-      ++(ctx->offset);
-      goto metadata;
-    }
     CASE('-')
     {
-      ++(ctx->offset);
       neg = 1;
-      goto metadata;
+    } __fallthrough__;
+    CASE('+')
+    {
+      ++(OFFSET);
+    } break;
+  }
+  if (*OFFSET == '0')
+  {
+    switch (*(++(OFFSET)))
+    {
+      CASE('x')
+      CASE('X')
+      {
+        ++(OFFSET);
+        base = 16;
+      } break;
+      CASE('o')
+      CASE('O')
+      {
+        ++(OFFSET);
+        base = 8;
+      } break;
+      CASE('b')
+      CASE('B')
+      {
+        ++(OFFSET);
+        base = 2;
+      } break;
+      CASE('\n')
+      CASE('\t')
+      CASE(' ')
+      CASE('\0')
+      CASE('#')
+      {
+        value->kind = TOML_INTEGER;
+        value->integer = 0;
+        // we just jump at the end
+        throw(OK);
+      }
+      default:
+      {
+        // XXX: remove this if we do the check in every function that calls
+        //      this function
+        throw(INVALID_NUMBER);
+      }
     }
+  } else if (OFFSET[0] == 'i' && OFFSET[1] == 'n' && OFFSET[2] == 'f')
+  {
+    value->kind = TOML_FLOAT;
+    value->float_ = __builtin_inff();
+    OFFSET += 3;
+    throw(OK);
+  } else if (OFFSET[0] == 'n' && OFFSET[1] == 'a' && OFFSET[2] == 'n')
+  {
+    value->kind = TOML_FLOAT;
+    value->float_ = __builtin_nanf("");
+    OFFSET += 3;
+    throw(OK);
   }
   try(
       parse_int(
-        &(ctx->offset), end, base, neg ? PARSE_INT_NEG : 0, &(value->integer)
+        &(OFFSET), end, base, neg ? PARSE_INT_NEG : 0, &(value->integer)
       )
   );
   if (
-    base == 10
-    && ctx->offset < ctx->end
-    && *ctx->offset == '.'
-    && is_digit(ctx->offset[1])
+      base == 10
+      && OFFSET < ctx->end
+      && *OFFSET == '.'
+      && is_digit(OFFSET[1])
   )
   {
-    ++(ctx->offset);
+    ++(OFFSET);
     double float_ = (double)value->integer;
     signed long frac_int = 0;
-    char const *offset = ctx->offset;
+    char const *offset = OFFSET;
     try(
         parse_int(
-          &(ctx->offset),
+          &(OFFSET),
           end,
           10,
           (neg ? PARSE_INT_NEG : 0)|PARSE_INT_ILZ,
@@ -344,7 +351,7 @@ metadata:
         )
     );
     double frac = (double)frac_int;
-    for (int i = 0, frac_len = ctx->offset - offset; i < frac_len; ++i)
+    for (int i = 0, frac_len = OFFSET - offset; i < frac_len; ++i)
     {
       frac /= 10;
     }
@@ -355,41 +362,41 @@ metadata:
     value->kind = TOML_INTEGER;
   }
   if (
-    ctx->offset < ctx->end
-    && base == 10
-    && (*ctx->offset == 'e' || *ctx->offset == 'E')
+      OFFSET < ctx->end
+      && base == 10
+      && (*OFFSET == 'e' || *OFFSET == 'E')
   )
   {
-    ++(ctx->offset);
+    ++(OFFSET);
     if (value->kind == TOML_INTEGER)
     {
       value->float_ = (double)value->integer;
     }
-    neg = 0;
-    switch (*ctx->offset)
+    switch (*OFFSET)
     {
       CASE('-')
       {
         neg = 1;
-      } __attribute__((fallthrough));
+      } __fallthrough__;
       CASE('+')
       {
-        ++(ctx->offset);
+        ++(OFFSET);
       }
     }
+    int neg_exp = 0;
     signed long e = 0;
-    try(parse_int(&(ctx->offset), ctx->end, 10, 0, &(e)));
+    try(parse_int(&(OFFSET), ctx->end, 10, 0, &(e)));
     double float_ = (value->kind == TOML_INTEGER ?
-                      (double)value->integer :
-                      value->float_);
+                    (double)value->integer :
+                    value->float_);
     for (int i = 0; i < e; ++(i))
     {
-      float_ = (neg ? (float_ / 10) : (float_ * 10));
+      float_ = (neg_exp ? (float_ / 10) : (float_ * 10));
     }
     value->float_ = float_;
   }
-catch:
 
+catch:
   return status;
 }
 
@@ -440,7 +447,7 @@ catch:
 TOMLStatus TOML_parse_sl_string(TOMLCtx *ctx, String *string)
 {
   TOMLStatus status = TOML_E_OK;
-  char const *offset = ctx->offset;
+  char const *offset = OFFSET;
   char const *const end = ctx->end;
 
   char quote = *(offset++);
@@ -494,14 +501,14 @@ catch:
   {
     StringBuffer_cleanup(buffer);
   }
-  ctx->offset = offset;
+  OFFSET = offset;
   return status;
 }
 
 TOMLStatus TOML_parse_ml_string(TOMLCtx *ctx, String *string)
 {
   TOMLStatus status = TOML_E_OK;
-  char const *offset = ctx->offset;
+  char const *offset = OFFSET;
   char const quote = *offset;
   offset += 3;
 
@@ -553,7 +560,7 @@ catch:
   {
     StringBuffer_cleanup(buffer);
   }
-  ctx->offset = offset;
+  OFFSET = offset;
   return status;
 }
 
@@ -562,58 +569,58 @@ catch:
 TOMLStatus TOML_parse_time(TOMLCtx *ctx, TOMLTime *time)
 {
   TOMLStatus status = TOML_E_OK;
-  char const *offset = ctx->offset;
   char const *const end = ctx->end;
   signed long parsed_num = 0;
 
   try_cond(
-      offset + 8 <= end && offset[2] == ':' && offset[5] == ':', INVALID_TIME
+      OFFSET + 8 <= end && OFFSET[2] == ':' && OFFSET[5] == ':', INVALID_TIME
   );
+  char const *old_offset = OFFSET;
 
-  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  parse_int(&(OFFSET), OFFSET + 2, 10, PARSE_INT_ILZ, &(parsed_num));
   register int const hour = (int)parsed_num;
-  throw_if(ctx->offset + 2 != offset, INVALID_TIME);
-  ++(offset);
+  throw_if(old_offset + 2 != OFFSET, INVALID_TIME);
+  ++(OFFSET);
 
-  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  parse_int(&(OFFSET), OFFSET + 2, 10, PARSE_INT_ILZ, &(parsed_num));
   register int const min = (int)parsed_num;
-  throw_if(ctx->offset + 5 != offset, INVALID_TIME);
-  ++(offset);
+  throw_if(old_offset + 5 != OFFSET, INVALID_TIME);
+  ++(OFFSET);
 
-  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  parse_int(&(OFFSET), OFFSET + 2, 10, PARSE_INT_ILZ, &(parsed_num));
   register int const sec = (int)parsed_num;
-  throw_if(ctx->offset + 8 != offset, INVALID_TIME);
+  throw_if(old_offset + 8 != OFFSET, INVALID_TIME);
 
   register int millisec = 0;
   int8_t z[3] = {0, -1, -1};
-  if (*offset == '.')
+  if (*OFFSET == '.')
   {
-    ++(offset);
-    parse_int(&(offset), offset + 5, 10, PARSE_INT_ILZ, &(parsed_num));
+    ++(OFFSET);
+    parse_int(&(OFFSET), OFFSET + 5, 10, PARSE_INT_ILZ, &(parsed_num));
     millisec = (int)parsed_num;
   }
-  switch (*offset)
+  switch (*OFFSET)
   {
     CASE('z')
     CASE('Z')
     {
       // if it's a 'z'/'Z' we just put 'Z' and exit from switch
       z[0] = 'Z';
-      ++(offset);
+      ++(OFFSET);
     } break;
     CASE('+')
     CASE('-')
     {
       // we put the one we have in buffer
-      z[0] = *((offset)++);
-      try_cond(offset + 2 <= end, INVALID_TIME);
-      parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+      z[0] = *((OFFSET)++);
+      try_cond(OFFSET + 2 <= end, INVALID_TIME);
+      parse_int(&(OFFSET), OFFSET + 2, 10, PARSE_INT_ILZ, &(parsed_num));
       z[1] = (uint8_t)parsed_num;
-      if (offset < end && *offset == ':')
+      if (OFFSET < end && *OFFSET == ':')
       {
-        ++(offset);
-        try_cond(offset + 2 <= end, INVALID_TIME);
-        parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+        ++(OFFSET);
+        try_cond(OFFSET + 2 <= end, INVALID_TIME);
+        parse_int(&(OFFSET), OFFSET + 2, 10, PARSE_INT_ILZ, &(parsed_num));
         z[2] = (uint8_t)parsed_num;
       }
     } break;
@@ -625,40 +632,37 @@ TOMLStatus TOML_parse_time(TOMLCtx *ctx, TOMLTime *time)
   memcpy(&(time->z), z, 3);
 
 catch:
-  ctx->offset = offset;
   return status;
 }
 
 TOMLStatus TOML_parse_datetime(TOMLCtx *ctx, TOMLValue *value)
 {
   TOMLStatus status = TOML_E_OK;
-  char const *offset = ctx->offset;
   char const *const end = ctx->end;
   signed long parsed_num = 0;
   try_cond(
-      offset + 10 <= end && offset[4] == '-' && offset[7] == '-', INVALID_DATE
+      OFFSET + 10 <= end && OFFSET[4] == '-' && OFFSET[7] == '-', INVALID_DATE
   );
-  parse_int(&(offset), offset + 4, 10, 0, &(parsed_num));
+  char const *old_offset = OFFSET;
+  parse_int(&(OFFSET), OFFSET + 4, 10, 0, &(parsed_num));
   register int const year = (int)parsed_num;
-  throw_if(ctx->offset + 4 != offset, INVALID_DATE);
-  ++(offset);
+  throw_if(old_offset + 4 != OFFSET, INVALID_DATE);
+  ++(OFFSET);
 
-  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  parse_int(&(OFFSET), OFFSET + 2, 10, PARSE_INT_ILZ, &(parsed_num));
   register int const month = (int)parsed_num;
-  throw_if(ctx->offset + 7 != offset, INVALID_DATE);
-  ++(offset);
+  throw_if(old_offset + 7 != OFFSET, INVALID_DATE);
+  ++(OFFSET);
 
-  parse_int(&(offset), offset + 2, 10, PARSE_INT_ILZ, &(parsed_num));
+  parse_int(&(OFFSET), OFFSET + 2, 10, PARSE_INT_ILZ, &(parsed_num));
   register int const day = (int)parsed_num;
 
-  char const current = *offset;
+  char const current = *OFFSET;
   TOMLDate *date;
-  if (offset < end && (current == 'T' || current == ' '))
+  if (OFFSET < end && (current == 'T' || current == ' '))
   {
-    ctx->offset = ++(offset);
-    status = TOML_parse_time(ctx, &(value->datetime.time));
-    offset = ctx->offset;
-    try(status);
+    old_offset = ++(OFFSET);
+    try(TOML_parse_time(ctx, &(value->datetime.time)));
     value->kind = TOML_DATETIME;
     date = &(value->datetime.date);
   } else
@@ -671,7 +675,6 @@ TOMLStatus TOML_parse_datetime(TOMLCtx *ctx, TOMLValue *value)
   date->day = day;
 
 catch:
-  ctx->offset = offset;
   return status;
 }
 
@@ -681,26 +684,26 @@ TOMLStatus TOML_parse_array(TOMLCtx *ctx, TOMLArray *array)
   char const *const end = ctx->end;
   TOMLArray vec = TOMLArray_new();
   throw_if(vec == NULL, OOM);
-  ++(ctx->offset);
+  ++(OFFSET);
 
-  for (int expect_value = 1; ctx->offset < end; )
+  for (int expect_value = 1; OFFSET < end; )
   {
-    char const chr = *ctx->offset;
+    char const chr = *OFFSET;
     if (chr == ']')
     {
       break;
     } else if (chr == ' ' || chr == '\n' || chr == '\t')
     {
-      ++(ctx->offset);
+      ++(OFFSET);
     } else if (chr == '#')
     {
-      char const *nl = strchr(ctx->offset, '\n');
+      char const *nl = strchr(OFFSET, '\n');
       throw_if(nl == NULL, ARRAY);
-      ctx->offset = nl + 1;
+      OFFSET = nl + 1;
     } else if (chr == ',')
     {
       throw_if(expect_value, UNEXPECTED_CHAR);
-      ++(ctx->offset);
+      ++(OFFSET);
       expect_value = 1;
     } else
     {
@@ -711,8 +714,8 @@ TOMLStatus TOML_parse_array(TOMLCtx *ctx, TOMLArray *array)
     }
   }
 
-  throw_if(*ctx->offset != ']', ARRAY);
-  ++(ctx->offset);
+  throw_if(*OFFSET != ']', ARRAY);
+  ++(OFFSET);
   *array = vec;
 
 catch:
@@ -726,33 +729,34 @@ catch:
 TOMLStatus TOML_parse_value(TOMLCtx *ctx, TOMLValue *value)
 {
   TOMLStatus status = TOML_E_OK;
-  char current = *ctx->offset;
+  char current = *OFFSET;
   switch (current)
   {
     CASE(' ')
     CASE('\t')
     {
-      ++(ctx->offset);
+      ++(OFFSET);
       return TOML_parse_value(ctx, value);
     }
     CASE('0'...'9')
     {
-      if (is_digit(ctx->offset[0]) && is_digit(ctx->offset[1]))
+      if (is_digit(OFFSET[0]) && is_digit(OFFSET[1]))
       {
-        if (is_digit(ctx->offset[2]) && is_digit(ctx->offset[3]) &&
-            ctx->offset[4] == '-')
+        if (is_digit(OFFSET[2]) && is_digit(OFFSET[3]) &&
+            OFFSET[4] == '-')
         {
           return TOML_parse_datetime(ctx, value);
-        } else if (ctx->offset[2] == ':')
+        } else if (OFFSET[2] == ':')
         {
           value->kind = TOML_TIME;
           return TOML_parse_time(ctx, &(value->time));
         }
       }
       // Will just continue and try to parse it as number.
-    } __attribute__((fallthrough));
+    } __fallthrough__;
     CASE('.')
     {
+number:
       return TOML_parse_number(ctx, value);
     }
     CASE('"')
@@ -760,7 +764,7 @@ TOMLStatus TOML_parse_value(TOMLCtx *ctx, TOMLValue *value)
     {
       value->string = NULL;
       value->kind = TOML_STRING;
-      if (ctx->offset[1] == current && ctx->offset[2] == current)
+      if (OFFSET[1] == current && OFFSET[2] == current)
       {
         return TOML_parse_ml_string(ctx, &(value->string));
       } else
@@ -775,11 +779,11 @@ TOMLStatus TOML_parse_value(TOMLCtx *ctx, TOMLValue *value)
     }
     CASE('f')
     {
-      if (memcmp(ctx->offset, "false", 5) == 0)
+      if (memcmp(OFFSET, "false", 5) == 0)
       {
         value->kind = TOML_BOOLEAN;
         value->integer = 0;
-        ctx->offset += 5;
+        OFFSET += 5;
       } else
       {
         throw(INVALID_VALUE);
@@ -787,11 +791,11 @@ TOMLStatus TOML_parse_value(TOMLCtx *ctx, TOMLValue *value)
     } break;
     CASE('t')
     {
-      if (memcmp(ctx->offset, "true", 4) == 0)
+      if (memcmp(OFFSET, "true", 4) == 0)
       {
         value->kind = TOML_BOOLEAN;
         value->integer = 1;
-        ctx->offset += 4;
+        OFFSET += 4;
       } else
       {
         throw(INVALID_VALUE);
@@ -799,36 +803,10 @@ TOMLStatus TOML_parse_value(TOMLCtx *ctx, TOMLValue *value)
     } break;
     CASE('i')
     CASE('n')
-    {
-      goto inf_check;
-    }
     CASE('+')
     CASE('-')
     {
-      ++(ctx->offset);
-inf_check:
-      if (ctx->offset[0] == 'i' && ctx->offset[1] == 'n' &&
-          ctx->offset[2] == 'f')
-      {
-        value->kind = TOML_FLOAT;
-        value->float_ = current == '-' ? -(__builtin_inff()) :
-                                          (__builtin_inff());
-        ctx->offset += 3;
-      } else if (ctx->offset[0] == 'n' && ctx->offset[1] == 'a' &&
-                 ctx->offset[2] == 'n')
-      {
-        value->kind = TOML_FLOAT;
-        value->float_ = current == '-' ? -(__builtin_nanf("")) :
-                                          (__builtin_nanf(""));
-        ctx->offset += 3;
-      } else if (current == '.' || in_range(current, '0', '9'))
-      {
-        --(ctx->offset);
-        status = TOML_parse_number(ctx, value);
-      } else
-      {
-        throw(INVALID_VALUE);
-      }
+      goto number;
     } break;
     CASE('{')
     {
@@ -846,13 +824,12 @@ catch:
   return status;
 }
 
-__attribute__((unused))
 static TOMLStatus parse_key(TOMLCtx *ctx, String *key)
 {
-  char c = *ctx->offset;
+  char c = *OFFSET;
   if (c == '\'' || c == '"')
   {
-    if (ctx->offset[1] == c && ctx->offset[2] == c)
+    if (OFFSET[1] == c && OFFSET[2] == c)
     {
       return TOML_parse_ml_string(ctx, key);
     } else
@@ -862,7 +839,7 @@ static TOMLStatus parse_key(TOMLCtx *ctx, String *key)
   } else
   {
     *key = (String)StringBuffer_new();
-    char const *offset = ctx->offset;
+    char const *offset = OFFSET;
     char const *const end = ctx->end;
     for (; (offset < end) &&
            (is_letter(c) || is_digit(c) || c == '_' || c == '-'); )
@@ -870,7 +847,7 @@ static TOMLStatus parse_key(TOMLCtx *ctx, String *key)
       StringBuffer_push((StringBuffer *)key, c);
       c = *(++(offset));
     }
-    ctx->offset = offset;
+    OFFSET = offset;
     StringBuffer_transform_to_string((StringBuffer *)key);
     return TOML_E_OK;
   }
@@ -880,17 +857,17 @@ TOMLStatus TOML_parse_entry(TOMLCtx *ctx, TOMLTable *table_p)
 {
   TOMLStatus status = TOML_E_OK;
   char const *const end = ctx->end;
-  char const *offset = ctx->offset;
+  char const *offset = OFFSET;
 
   String key = NULL;
-  for (; offset <= end; ctx->offset = offset)
+  for (; offset <= end; OFFSET = offset)
   {
     try(parse_key(ctx, &key));
-    offset = ctx->offset;
+    offset = OFFSET;
     TOMLValue *val_p = TOMLTable_put(table_p, key);
     for (int running = 1; running; )
     {
-      ctx->offset = offset;
+      OFFSET = offset;
       char chr = *offset;
       if (chr == '.')
       {
@@ -915,7 +892,7 @@ TOMLStatus TOML_parse_entry(TOMLCtx *ctx, TOMLTable *table_p)
           continue;
         } else if (chr == '=')
         {
-          ctx->offset = ++(offset);
+          OFFSET = ++(offset);
           return TOML_parse_value(ctx, val_p);
         }
       }
@@ -931,7 +908,7 @@ catch:
       String_cleanup(key);
     }
   }
-  ctx->offset = offset;
+  OFFSET = offset;
   return status;
 }
 
@@ -939,24 +916,24 @@ TOMLStatus TOML_parse_inline_table(TOMLCtx *ctx, TOMLTable *table_p)
 {
   TOMLStatus status = TOML_E_OK;
   char const *const end = ctx->end;
-  ++(ctx->offset);
-  for (int expect_entry = 1; ctx->offset < end; )
+  ++(OFFSET);
+  for (int expect_entry = 1; OFFSET < end; )
   {
-    char __c = *ctx->offset;
+    char __c = *OFFSET;
     if (is_empty(__c))
     {
-      ++(ctx->offset);
+      ++(OFFSET);
     } else if (__c == ',')
     {
       throw_if(expect_entry, ENTRY_EXPECTED);
       expect_entry = 1;
-      ++(ctx->offset);
+      ++(OFFSET);
     } else if (__c == '}')
     {
       break;
     } else if (__c == '#')
     {
-      skip_comment(ctx->offset);
+      skip_comment(OFFSET);
     } else if (is_letter(__c) || is_digit(__c) ||
                __c == '"' || __c == '\'' || __c == '-' || __c == '_')
     {
@@ -968,12 +945,12 @@ TOMLStatus TOML_parse_inline_table(TOMLCtx *ctx, TOMLTable *table_p)
       throw(UNEXPECTED_CHAR);
     }
   }
-  if (*ctx->offset != '}')
+  if (*OFFSET != '}')
   {
     status = TOML_E_INLINE_TABLE;
   } else
   {
-    ++(ctx->offset);
+    ++(OFFSET);
   }
 catch:
   return status;
@@ -984,12 +961,12 @@ TOMLStatus TOML_parse_table_header(TOMLCtx *ctx, TOMLTable *table_p,
 {
   TOMLStatus status = TOML_E_OK;
   String key = NULL;
-  for (; ctx->offset < ctx->end && *ctx->offset != ']'; )
+  for (; OFFSET < ctx->end && *OFFSET != ']'; )
   {
     try(parse_key(ctx, &(key)));
-    if (*ctx->offset == '.')
+    if (*OFFSET == '.')
     {
-      ++(ctx->offset);
+      ++(OFFSET);
       TOMLValue *val_p = TOMLTable_put(table_p, key);
       if (val_p->kind == 0)
       {
@@ -1002,21 +979,21 @@ TOMLStatus TOML_parse_table_header(TOMLCtx *ctx, TOMLTable *table_p,
         throw_if(val_p->kind != TOML_TABLE, EXPECTED_TABLE);
       }
       table_p = &(val_p->table);
-    } else if (*ctx->offset == ' ' || *ctx->offset == '\t')
+    } else if (*OFFSET == ' ' || *OFFSET == '\t')
     {
-      ++(ctx->offset);
-    } else if (*ctx->offset == '#')
+      ++(OFFSET);
+    } else if (*OFFSET == '#')
     {
-      skip_comment(ctx->offset);
-    } else if (*ctx->offset != ']')
+      skip_comment(OFFSET);
+    } else if (*OFFSET != ']')
     {
       throw(INVALID_HEADER);
     }
   }
-  if (ctx->offset[1] == ']')
+  if (OFFSET[1] == ']')
   {
     throw_if(!is_tblarr, TABLE_ARRAY_HEADER);
-    ++(ctx->offset);
+    ++(OFFSET);
     TOMLValue *arrval_p = TOMLTable_put(table_p, key);
     TOMLValue *tblval_p = NULL;
     if (arrval_p->kind != 0)
@@ -1047,7 +1024,7 @@ TOMLStatus TOML_parse_table_header(TOMLCtx *ctx, TOMLTable *table_p,
     }
     *out_pp = &(tblval_p->table);
   }
-  ++(ctx->offset);
+  ++(OFFSET);
 catch:
   return status;
 }
@@ -1055,20 +1032,20 @@ catch:
 TOMLStatus TOML_parse_table(TOMLCtx *ctx, TOMLTable *table_p)
 {
   TOMLStatus status = TOML_E_OK;
-  ++(ctx->offset);
+  ++(OFFSET);
   int is_tblarr = 0;
-  if (*ctx->offset == '[')
+  if (*OFFSET == '[')
   {
-    ++(ctx->offset);
+    ++(OFFSET);
     is_tblarr = 1;
   }
   TOMLTable *this_table = NULL;
   try(TOML_parse_table_header(ctx, table_p, &this_table, is_tblarr));
-  for (; ctx->offset < ctx->end && *ctx->offset != '['; )
+  for (; OFFSET < ctx->end && *OFFSET != '['; )
   {
-    if (is_empty(*ctx->offset))
+    if (is_empty(*OFFSET))
     {
-      ++(ctx->offset);
+      ++(OFFSET);
     } else
     {
       try(TOML_parse_entry(ctx, this_table));
@@ -1081,15 +1058,15 @@ catch:
 TOMLStatus TOML_parse(TOMLCtx *ctx, TOMLTable *table_p)
 {
   TOMLStatus status = TOML_E_OK;
-  for (; ctx->offset < ctx->end; )
+  for (; OFFSET < ctx->end; )
   {
-    if (is_empty(*ctx->offset))
+    if (is_empty(*OFFSET))
     {
-      ++(ctx->offset);
-    } else if (*ctx->offset == '#')
+      ++(OFFSET);
+    } else if (*OFFSET == '#')
     {
-      skip_comment(ctx->offset);
-    } else if (*ctx->offset == '[')
+      skip_comment(OFFSET);
+    } else if (*OFFSET == '[')
     {
       try(TOML_parse_table(ctx, table_p));
     } else
