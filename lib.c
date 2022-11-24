@@ -514,10 +514,11 @@ TOMLStatus TOML_parse_ml_string(TOMLCtx *ctx, String *string)
 
   char quotes[] = {quote, quote, quote, 0};
   char const *str_end = strstr(offset, quotes);
+  StringBuffer buffer = NULL;
   throw_if(str_end == NULL, UNTERMINATED_STRING);
   int len = str_end - offset;
 
-  StringBuffer buffer = StringBuffer_with_capacity(len + 1);
+  buffer = StringBuffer_with_capacity(len + 1);
   throw_if(buffer == NULL, OOM);
 
   int trimming = 0;
@@ -1060,13 +1061,14 @@ TOMLStatus TOML_parse(TOMLCtx *ctx, TOMLTable *table_p)
   TOMLStatus status = TOML_E_OK;
   for (; OFFSET < ctx->end; )
   {
-    if (is_empty(*OFFSET))
+    char const chr = *OFFSET;
+    if (is_empty(chr))
     {
       ++(OFFSET);
-    } else if (*OFFSET == '#')
+    } else if (chr == '#')
     {
       skip_comment(OFFSET);
-    } else if (*OFFSET == '[')
+    } else if (chr == '[')
     {
       try(TOML_parse_table(ctx, table_p));
     } else
