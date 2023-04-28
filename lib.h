@@ -1,3 +1,7 @@
+/*
+ * @file lib.h
+ */
+
 #ifndef C_TOML_H
 #define C_TOML_H
 #include <stdint.h>
@@ -7,6 +11,10 @@
 // TOML data type ids
 #ifdef DEBUG
 
+/**
+ * @enum TOMLKind
+ * @brief The TOML value kinds.
+ */
 typedef enum TOMLKind {
 #define K(k) TOML_##k
   K(INTEGER) = 1,
@@ -89,6 +97,10 @@ typedef signed int TOMLStatus; // determines success or the error kind
 
 void TOMLValue_print(TOMLValue const *, int);
 
+/**
+ * @struct TOMLTime
+ * @brief A TOML time value.
+ */
 struct TOMLTime {
   uint16_t millisec;
   uint8_t  hour;
@@ -97,7 +109,10 @@ struct TOMLTime {
   // [0] = ("+" | "-")
   // [1] = <hour>
   // [2] = <minutes>
-  int8_t   z[3];
+  int8_t   z[3]; ///< The timezone offset. The first byte is either `+` or `-`
+                 ///< and determines whether it is positive or negative offset.
+                 ///< The second byte is the offset of hours and the third byte
+                 ///< the offset of minutes.
 }__attribute__((packed));
 
 struct TOMLDate {
@@ -111,6 +126,10 @@ struct TOMLDateTime {
   TOMLTime time;
 };
 
+/**
+ * @struct TOMLValue
+ * @brief A tagged union wrapping the different TOML values.
+ */
 struct TOMLValue {
   union {
     String       string;
@@ -122,9 +141,9 @@ struct TOMLValue {
     TOMLDate     date;
     TOMLTime     time;
     TOMLDateTime datetime;
-  };
-  TOMLKind kind;
-};
+  }__attribute__((packed));
+  TOMLKind kind; ///< The kind of the TOML value.
+}__attribute__((packed));
 
 #define CVECTOR_POINTERMODE
 #define CVECTOR_NO_TYPEDEF
@@ -132,41 +151,60 @@ struct TOMLValue {
 CVECTOR_WITH_NAME(TOMLValue, TOMLArray);
 void TOMLArray_destroy(TOMLArray);
 
+/**
+ * @struct TOMLCtx
+ * @brief The parsing context of the parser.
+ *
+ * Multiple contexts can be created with for different strings with
+ * TOML data to parse without them interfering with each other.
+ */
 struct TOMLCtx {
-  String       file_path;
-  StringBuffer content;
-  char const   *end;
-  char const   *offset;
+  StringBuffer content; ///< The StringBuffer with the TOML data.
+  char const   *end;    ///< The address of the end of the content.
+  char const   *offset; ///< The pointer to the part of the content that will
+                        ///< be used by the next call of a parsing function.
 };
 
+/**
+ * @struct TOMLPosition
+ * @brief The position of the cursor of a parsing context in the content.
+ */
 struct TOMLPosition {
-  int offset; // cursor (the index where we are at the buffer)
-  int line;
-  int column;
+  int offset; ///< The cursor's offset from the starting character.
+  int line;   ///< The line position of the cursor.
+  int column; ///< The column position of the cursor.
 };
 
 TOMLStatus  TOML_init              (TOMLCtx *, char *);
-
-// TOMLStatus  TOML_parse_int       (char const **, char const *, int,  int, signed long *);
-// Checks and invokes the right parser function.
 TOMLStatus  TOML_parse_value       (TOMLCtx *, TOMLValue *);
-// It can be an integer or a float, we don't know before we parse it.
 TOMLStatus  TOML_parse_number      (TOMLCtx *, TOMLValue *);
-// Takes String * because we know it's a string.
 TOMLStatus  TOML_parse_sl_string   (TOMLCtx *, String *);
 TOMLStatus  TOML_parse_ml_string   (TOMLCtx *, String *);
 TOMLStatus  TOML_parse_time        (TOMLCtx *, TOMLTime *);
 TOMLStatus  TOML_parse_datetime    (TOMLCtx *, TOMLValue *);
-// Like above, we know it's an array.
 TOMLStatus  TOML_parse_array       (TOMLCtx *, TOMLArray *);
 TOMLStatus  TOML_parse_entry       (TOMLCtx *, TOMLTable *);
 TOMLStatus  TOML_parse_inline_table(TOMLCtx *, TOMLTable *);
 TOMLStatus  TOML_parse_table_header(TOMLCtx *, TOMLTable *,
                                     TOMLTable **, int);
 TOMLStatus  TOML_parse_table       (TOMLCtx *, TOMLTable *);
+/**
+ * @brief Parses a TOML buffer.
+ */
 TOMLStatus  TOML_parse             (TOMLCtx *, TOMLTable *);
 
+/**
+ * @fn TOMLValue_destroy(TOMLValue *value)
+ * @brief Frees `value`.
+ *
+ * If it is a container, it frees all the @link TOMLValue @endlink s it
+ * contains recursively.
+ */
 void TOMLValue_destroy(TOMLValue *);
+/**
+ * @fn TOML_position(TOMLCtx const *ctx)
+ * @brief Get the position of the parsing context `ctx`.
+ */
 TOMLPosition TOML_position(TOMLCtx const *);
 
 #include "table.h"

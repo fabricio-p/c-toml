@@ -10,13 +10,13 @@ CFLAGS += -std=c99 -I . -I cake_libs/																	\
 					-Wno-unused-parameter -Wno-unused-command-line-argument			\
 					-Wno-missing-braces -Wno-unused-function										\
 					-Wno-strict-prototypes -Wno-old-style-definition						\
-					-Wimplicit-fallthrough=1
+					-Wimplicit-fallthrough=1 -Wno-address-of-packed-member -pg
 LDFLAGS += -lcunit -lxxhash
 
 ifeq ($(MODE),debug)
 	CFLAGS += -DDEBUG -O0 -ggdb
 else
-	CFLAGS += -O3
+	CFLAGS += -Ofast
 endif
 
 .PHONY: all lib_test clean

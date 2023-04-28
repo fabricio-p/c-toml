@@ -12,7 +12,6 @@
 TOMLCtx make_toml(char const *const data, int const offset)
 {
   return (TOMLCtx) {
-    .file_path = (String)"<<memory>>",
     .content = (StringBuffer)data,
     .end = (char *)data + strlen(data),
     .offset = (char *)data + offset
@@ -110,12 +109,21 @@ void test_parse_sl_string(void)
   String_cleanup(str);
   str = NULL;
 
-  ctx =  make_toml("'literal strings go brrr\\n'", 0);
+  ctx = make_toml("'literal strings go brrr\\n'", 0);
   CU_ASSERT_EQUAL_FATAL(TOML_parse_sl_string(&ctx, &str), TOML_E_OK);
   position = TOML_position(&ctx);
   CU_ASSERT_STRING_EQUAL_FATAL(str, "literal strings go brrr\\n");
   CU_ASSERT_EQUAL_FATAL(position.offset, 27);
   CU_ASSERT_EQUAL_FATAL(position.column, 27);
+  String_cleanup(str);
+  str = NULL;
+
+  ctx = make_toml("\"\\u33\"", 0);
+  CU_ASSERT_EQUAL_FATAL(TOML_parse_sl_string(&ctx, &str), TOML_E_OK);
+  position = TOML_position(&ctx);
+  CU_ASSERT_STRING_EQUAL_FATAL(str, "\x33");
+  CU_ASSERT_EQUAL_FATAL(position.offset, 6);
+  CU_ASSERT_EQUAL_FATAL(position.column, 6);
   String_cleanup(str);
 }
 

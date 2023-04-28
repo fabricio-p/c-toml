@@ -1,3 +1,8 @@
+/*
+ * @file lib.c
+ * @brief Functions for parsing and printing TOML data.
+ */
+
 #include <stdint.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -13,6 +18,12 @@
 
 // TODO: [TOML_parse_number] Do more checks for value correctness,
 //                           Check for float overflows
+
+// TODO: [TOML_parse_{m,s}l_string] Don't allocate a new string if the value
+//                                  pointed by `string` is not NULL.
+
+// TODO: [TOML_parse_array] Don't allocate a new array if the value
+//                                  pointed by `array` is not NULL.
 
 // XXX: Consider implementing unitype arrays for memory efficiency,
 //        may need to sacrifice some performance
@@ -101,6 +112,9 @@ static TOMLStatus parse_int(
   return status;
 }
 
+/*
+ * @brief Recursively free the TOML value.
+ */
 void TOMLValue_destroy(TOMLValue *val)
 {
   if (val->kind == TOML_STRING)
@@ -115,6 +129,10 @@ void TOMLValue_destroy(TOMLValue *val)
   }
 }
 
+/**
+ * @brief Calls @link TOMLValue_destroy @endlink on all the items and frees
+ *        the array.
+ */
 void TOMLArray_destroy(TOMLArray array)
 {
   for (int i = 0, len = TOMLArray_len(array); i < len; ++(i))
@@ -124,6 +142,9 @@ void TOMLArray_destroy(TOMLArray array)
   TOMLArray_cleanup(array);
 }
 
+/**
+ * @brief Gets the current possition of the parser.
+ */
 TOMLPosition TOML_position(TOMLCtx const *ctx)
 {
   const char *const offset = OFFSET;
@@ -170,12 +191,19 @@ void print_date(TOMLDate const *const date)
   printf("%4d-%2d-%2d", date->year, date->month, date->day);
 }
 
-void TOMLValue_print(TOMLValue const *value, int indent)
+//TODO:: Make it print into @link FILE @endlink s
+/**
+ * @brief Prints a @link TOMLValue @endlink to the standard output.
+ * @param value The value to be printed.
+ * @param level The depth inside a container value determining indentation
+ *              level, used for pretty printing container values.
+ */
+void TOMLValue_print(TOMLValue const *value, int level)
 {
 #define KIND(c) CASE(TOML_##c)
 #define SIMPLE(c, f, ...) KIND(c) { printf(f, __VA_ARGS__); break; }
-  int const inner_space_count = (indent + 1) * INDENT_SIZE;
-  int const outer_space_count = indent * INDENT_SIZE;
+  int const inner_space_count = (level + 1) * INDENT_SIZE;
+  int const outer_space_count = level * INDENT_SIZE;
   switch (value->kind)
   {
     SIMPLE(INTEGER,
@@ -212,7 +240,7 @@ void TOMLValue_print(TOMLValue const *value, int indent)
       for (; current < end; ++(current))
       {
         for (int i = 0; i < inner_space_count; ++(i), putchar(' '));
-        TOMLValue_print(current, indent + 1);
+        TOMLValue_print(current, level + 1);
         puts(current < end - 1 ? "," : "");
       }
       for (int i = 0; i < outer_space_count; ++(i), putchar(' '));
@@ -237,7 +265,7 @@ void TOMLValue_print(TOMLValue const *value, int indent)
               ANSIQ_SETFG_CYAN "%.*s" ANSIQ_GR_RESET " = ",
               String_len(current->key), current->key
           );
-          TOMLValue_print(&(current->value), indent + 1);
+          TOMLValue_print(&(current->value), level + 1);
           puts(current < end - 1 ? "," : "");
         }
       }
@@ -249,12 +277,25 @@ void TOMLValue_print(TOMLValue const *value, int indent)
       break;
     }
   }
-  if (indent == 0)
+  if (level == 0)
   {
     putchar('\n');
   }
 }
 
+/**
+ * @brief Parses a numerical value.
+ * @param value The pointer to the @link TOMLValue @endlink where the parsed
+ *              number will be stored. If the number is a float, `value->kind`
+ *              will be set to @link TOML_FLOAT @endlink and `value->float_`
+ *              to the parsed value. If it is an integer, `value->kind` will
+ *              be set to @link TOML_INTEGER @endlink and `value->integer` to
+ *              the parsed value.
+ * @returns @link TOML_E_INVALID_NUMBER @endlink when trying to parse an
+ *          invalid numerical value,
+ *          @link TOML_E_INT_OVERFLOW @endlink when trying to parse an integer
+ *          that is too big.
+ */
 TOMLStatus TOML_parse_number(TOMLCtx *ctx, TOMLValue *value)
 {
   TOMLStatus status = TOML_E_OK;
@@ -418,15 +459,18 @@ catch:
   }                                                           \
   CASE('u')                                                   \
   CASE('U')                                                   \
+  CASE('x')                                                   \
+  CASE('X')                                                   \
   {                                                           \
     ++(offset);                                               \
     throw_if(                                                 \
-        !is_hex(offset[0]) || !is_hex(offset[1]),             \
+        !is_hex((offset)[0]) || !is_hex((offset)[1]),         \
         INVALID_HEX_ESCAPE                                    \
     );                                                        \
     signed long charcode = 0;                                 \
-    parse_int(&offset, offset + 2, 16, 0, &(charcode));       \
+    parse_int(&(offset), offset + 2, 16, 0, &(charcode));     \
     chr = (char)charcode;                                     \
+    --(offset);                                               \
     break;                                                    \
   }                                                           \
   CASE('\\')                                                  \
@@ -444,6 +488,10 @@ catch:
     break;                                                    \
   }
 
+/**
+ * @brief Parses a single-line string.
+ * @param string The address where the parsed string will be stored.
+ */
 TOMLStatus TOML_parse_sl_string(TOMLCtx *ctx, String *string)
 {
   TOMLStatus status = TOML_E_OK;
@@ -451,49 +499,30 @@ TOMLStatus TOML_parse_sl_string(TOMLCtx *ctx, String *string)
   char const *const end = ctx->end;
 
   char quote = *(offset++);
-  int len;
-  do {
-    char *str_end = strchr(offset, quote);
-    len = str_end == NULL ? 0 : str_end - offset;
-  } while (0);
 
-  StringBuffer buffer = StringBuffer_with_capacity(len + 1);
+  StringBuffer buffer = StringBuffer_with_capacity(8);
   throw_if(buffer == NULL, OOM);
 
   for (char chr; offset < end; ++(offset))
-
   {
     chr = *offset;
-    switch (chr)
+    throw_if(chr == '\n', UNTERMINATED_STRING);
+    if (chr == '\\' && quote == '"')
     {
-      CASE('\n')
+      ++offset;
+      switch (*(offset))
       {
-        throw(UNTERMINATED_STRING);
+        HANDLE_ESCAPE_CASES(chr, offset);
       }
-      CASE('\\')
-      {
-        if (quote == '"')
-        {
-          switch (*(++(offset)))
-          {
-            HANDLE_ESCAPE_CASES(chr, offset);
-          }
-        }
-        break;
-      }
-      default:
-      {
-        if (chr == quote)
-        {
-          goto out;
-        }
-      }
+    } else if (chr == quote)
+    {
+      break;
     }
     throw_if(StringBuffer_push(&buffer, chr) != 0, OOM);
   }
 
-out:
-  throw_if(*(offset++) != quote, UNTERMINATED_STRING);
+  throw_if(*offset != quote, UNTERMINATED_STRING);
+  ++offset;
   *string = StringBuffer_transform_to_string(&buffer);
 
 catch:
@@ -505,6 +534,10 @@ catch:
   return status;
 }
 
+/**
+ * @brief Parses a multi-line string.
+ * @param string The address where the parsed string will be stored.
+ */
 TOMLStatus TOML_parse_ml_string(TOMLCtx *ctx, String *string)
 {
   TOMLStatus status = TOML_E_OK;
@@ -567,6 +600,11 @@ catch:
 
 #undef HANDLE_ESCAPE_CASES
 
+/**
+ * @brief Parses a TOML time value.
+ * @param time Pointer to a @link TOMLTime @endlink struct where the parsed
+ *             data will be stored.
+ */
 TOMLStatus TOML_parse_time(TOMLCtx *ctx, TOMLTime *time)
 {
   TOMLStatus status = TOML_E_OK;
@@ -636,6 +674,13 @@ catch:
   return status;
 }
 
+/*
+ * @brief Parses a TOML date or date-time value.
+ * @param value The pointer to the @link TOMLValue @endlink struct where the
+ *              parsed data will be stored. The `kind` field will be set to
+ *              either @link TOML_DATE @endlink or @link TOML_DATETIME @endlink
+ *              according to the content provided for parsing.
+ */
 TOMLStatus TOML_parse_datetime(TOMLCtx *ctx, TOMLValue *value)
 {
   TOMLStatus status = TOML_E_OK;
@@ -679,6 +724,10 @@ catch:
   return status;
 }
 
+/**
+ * @brief Parses a TOML array value.
+ * @param array The address where the parsed array will be stored.
+ */
 TOMLStatus TOML_parse_array(TOMLCtx *ctx, TOMLArray *array)
 {
   TOMLStatus status = TOML_E_OK;
@@ -727,6 +776,12 @@ catch:
   return status;
 }
 
+/**
+ * @brief Parses a TOML value.
+ * @param value The address to the @link TOMLValue @endlink struct where the
+ *              data parsed will be stored. The `kind` field will be set
+ *              according to the content provided for parsing.
+ */
 TOMLStatus TOML_parse_value(TOMLCtx *ctx, TOMLValue *value)
 {
   TOMLStatus status = TOML_E_OK;
@@ -854,6 +909,11 @@ static TOMLStatus parse_key(TOMLCtx *ctx, String *key)
   }
 }
 
+/**
+ * @brief Parses a TOML entry of the form of `key = value` pair.
+ * @param table_p The pointer to the table where the parsed entry will be
+ *                stored.
+ */
 TOMLStatus TOML_parse_entry(TOMLCtx *ctx, TOMLTable *table_p)
 {
   TOMLStatus status = TOML_E_OK;
@@ -913,6 +973,11 @@ catch:
   return status;
 }
 
+/**
+ * @brief Parses a TOML inline-table value.
+ * @param table_p The pointer to the table where the parsed entries of the
+ *                    table value will be stored.
+ */
 TOMLStatus TOML_parse_inline_table(TOMLCtx *ctx, TOMLTable *table_p)
 {
   TOMLStatus status = TOML_E_OK;
@@ -957,6 +1022,16 @@ catch:
   return status;
 }
 
+/**
+ * @brief Parses the header of a TOML table or table array.
+ *        The opening bracket(s) should be skipped before the function is
+ *        called.
+ * @param table_p The pointer to the parent table.
+ * @param out_pp The address of a variable that points to a table.
+ *               That variable will be set to the address of the final table
+ *               because table headers can take the form `[key1.key2]`.
+ * @param is_tblarr `0` to parse a table header, `1` a table array header.
+ */
 TOMLStatus TOML_parse_table_header(TOMLCtx *ctx, TOMLTable *table_p,
                                    TOMLTable **out_pp, int is_tblarr)
 {
@@ -1030,6 +1105,10 @@ catch:
   return status;
 }
 
+/**
+ * @brief Parses the entries of a table or table array.
+ * @param table_p The pointer to the the parent table.
+ */
 TOMLStatus TOML_parse_table(TOMLCtx *ctx, TOMLTable *table_p)
 {
   TOMLStatus status = TOML_E_OK;
