@@ -112,6 +112,14 @@ static TOMLStatus parse_int(
   return status;
 }
 
+void TOML_init(TOMLCtx *ctx, StringBuffer input)
+{
+  TOMLStatus status = TOML_S_OK;
+  ctx->content = input;
+  ctx->end = input + StringBuffer_len(input);
+  ctx->offset = input;
+}
+
 /*
  * @brief Recursively free the TOML value.
  */

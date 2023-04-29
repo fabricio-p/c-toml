@@ -175,7 +175,7 @@ struct TOMLPosition {
   int column; ///< The column position of the cursor.
 };
 
-TOMLStatus  TOML_init              (TOMLCtx *, char *);
+void        TOML_init              (TOMLCtx *, StringBuffer);
 TOMLStatus  TOML_parse_value       (TOMLCtx *, TOMLValue *);
 TOMLStatus  TOML_parse_number      (TOMLCtx *, TOMLValue *);
 TOMLStatus  TOML_parse_sl_string   (TOMLCtx *, String *);
