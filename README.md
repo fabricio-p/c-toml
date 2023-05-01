@@ -1,17 +1,17 @@
 # c-toml
 --------
 
-[c-toml]() is a TOML parsing library written in C with performance, ease of use and customizability.
+[c-toml](https://github.com/fabriciopashaj/c-toml) is a TOML parsing library written in C with performance, ease of use and customizability in mind.
 
 ## Content table
   1. [Usage](#Usage)
   2. [Requirements](#Requirements)
   3. [Examples](#Examples)
-     1. [Parsing values](#Parsing-literals)
-        1. [Literals](#Literals)
-        2. [Compounds](#Ccompounds)
-     2. [Parsing tables](#Parsing-tables)
-     3. [Parsing files](#Parsing-tables)
+     1. [Parsing values](#parsing-values)
+        1. [Literals](#literals)
+        2. [Compounds](#compounds)
+     2. [Parsing tables](#parsing-tables)
+     3. [Parsing files](#parsing-tables)
 
 ## Usage
 First clone the repository
@@ -28,14 +28,14 @@ Make sure to have built the static library when you build your project.
 
 ## Requirements
 The library has some minor requirements, utilities for it to function. They are
-  - [c-vector]()
-  - [c-string]()
-  - [c-ansi-sequences]()
+  - [c-vector](https://github.com/fabriciopashaj/c-vector)
+  - [c-string](https://github.com/fabriciopashaj/c-string)
+  - [c-ansi-sequences](https://github.com/fabriciopashaj/c-ansi-sequences)
 
 To have them installed you only need to run `setup.sh` and you don't need to worry about building them, since they are header-only libraries.
 
 ## Examples
-Here are some examples on how to use the library. [c-toml]() provides you with functions to parse from whole TOMl files to individual key-value pairs and values.
+Here are some examples on how to use the library. [c-toml](https://github.com/fabriciopashaj/c-toml) provides you with functions to parse from whole TOMl files to individual key-value pairs and values.
 
 ### Parsing values
 #### Literals
@@ -223,10 +223,4 @@ assert(TOML_parse(&ctx, &config) == TOML_S_OK);
 // TOMLTable_destroy(config); // don't forget this when you are done
 ```
 
-For more examples check the [tests]().
-
-  [c-toml]: https://github.com/fabriciopashaj/c-toml
-  [c-vector]: https://github.com/fabriciopashaj/c-vector
-  [c-string]: https://github.com/fabriciopashaj/c-string
-  [s-ansi-sequences]: https://github.com/fabriciopashaj/c-ansi-sequences
-  [tests]: https://github.com/fabriciopashaj/c-toml/blob/main/test/lib_test.c
+For more examples check the [tests](https://github.com/fabriciopashaj/c-toml/blob/main/test/lib_test.c).
